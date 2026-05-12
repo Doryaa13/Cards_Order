@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>סידור קלפים להדפסה</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    :root {
+      --bg:       #0d1117;
+      --surface:  #161b22;
+      --surface2: #21262d;
+      --border:   #30363d;
+      --accent:   #238636;
+      --accent-h: #2ea043;
+      --danger:   #da3633;
+      --text:     #c9d1d9;
+      --muted:    #8b949e;
+      --blue:     #58a6ff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { font-size: 1.2rem; font-weight: 600; }
+    header .sub { color: var(--muted); font-size: 0.82rem; }
+
+    /* ── Layout ── */
+    .app {
+      display: grid;
+      grid-template-columns: 1fr 310px;
+      min-height: calc(100vh - 53px);
+    }
+    .main   { padding: 16px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+    .sidebar {
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    /* ── Panel card ── */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      font-size: 0.85rem;
+      background: var(--surface2);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .panel-body { padding: 16px; }
+
+    /* ── Sidebar sections ── */
+    .sec-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--muted);
+      margin: 14px 0 6px;
+    }
+    .sec-title:first-child { margin-top: 0; }
+    hr.div { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+
+    /* ── Form ── */
+    .fg { margin-bottom: 8px; }
+    label { display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 3px; }
+    select, input[type="number"] {
+      width: 100%;
+      padding: 6px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 0.85rem;
+      transition: border-color 0.15s;
+    }
+    select:focus, input[type="number"]:focus {
+      outline: none;
+      border-color: var(--blue);
+    }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      width: 100%; padding: 8px 14px;
+      border-radius: 6px; border: 1px solid;
+      font-size: 0.85rem; font-weight: 500; cursor: pointer;
+      transition: all 0.15s; margin-bottom: 8px; text-align: center;
+    }
+    .btn:last-child { margin-bottom: 0; }
+    .btn-green  { background: var(--accent);  border-color: var(--accent-h); color: #fff; }
+    .btn-green:hover  { background: var(--accent-h); }
+    .btn-grey   { background: var(--surface2); border-color: var(--border);  color: var(--text); }
+    .btn-grey:hover   { background: var(--border); }
+    .btn-danger { background: transparent; border-color: var(--border); color: var(--danger); }
+    .btn-danger:hover { background: rgba(218,54,51,.1); border-color: var(--danger); }
+
+    /* ── Stats badge ── */
+    .stats {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 20px; padding: 4px 12px;
+      font-size: 0.78rem; color: var(--muted);
+      text-align: center; margin-top: 8px;
+    }
+
+    /* ── Upload zone ── */
+    .upload-zone {
+      border: 2px dashed var(--border); border-radius: 6px;
+      padding: 28px 16px; text-align: center; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .upload-zone:hover, .upload-zone.drag-active {
+      border-color: var(--blue);
+      background: rgba(88,166,255,.05);
+    }
+    .upload-zone .icon { font-size: 2.2rem; margin-bottom: 6px; }
+    .upload-zone p    { font-size: 0.82rem; color: var(--muted); margin-top: 3px; }
+
+    /* ── Thumbnails ── */
+    .thumb-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+      gap: 6px; margin-top: 12px;
+    }
+    .thumb {
+      position: relative; border-radius: 4px; overflow: hidden;
+      border: 2px solid var(--border); cursor: grab;
+      aspect-ratio: 5/7; background: var(--surface2);
+      transition: border-color 0.15s;
+      user-select: none;
+    }
+    .thumb:hover           { border-color: var(--blue); }
+    .thumb.dragging        { opacity: 0.4; border-color: var(--blue); }
+    .thumb.drag-over       { border-color: var(--accent); border-style: dashed; }
+    .thumb img             { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+    .thumb .del {
+      position: absolute; top: 2px; right: 2px;
+      width: 18px; height: 18px;
+      background: rgba(218,54,51,.9); border: none;
+      border-radius: 50%; color: #fff; font-size: 11px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      opacity: 0; transition: opacity 0.15s;
+    }
+    .thumb:hover .del      { opacity: 1; }
+    .thumb .num {
+      position: absolute; bottom: 2px; left: 2px;
+      background: rgba(0,0,0,.7); color: #fff;
+      font-size: 9px; padding: 1px 4px; border-radius: 3px;
+    }
+    .count-badge {
+      display: inline-block; background: var(--blue);
+      color: #0d1117; font-size: 0.68rem; font-weight: 700;
+      border-radius: 10px; padding: 1px 7px;
+    }
+
+    /* ── Preview area ── */
+    .preview-wrap {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 20px;
+      padding: 20px; min-height: 400px;
+    }
+    .page-wrap { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .page-lbl  { font-size: 0.75rem; color: var(--muted); }
+    canvas.page-canvas {
+      box-shadow: 0 4px 24px rgba(0,0,0,.6);
+      display: block; max-width: 100%;
+    }
+
+    .empty-state {
+      text-align: center; padding: 60px 20px; color: var(--muted);
+    }
+    .empty-state .e-icon { font-size: 3rem; margin-bottom: 10px; }
+
+    /* ── Loading overlay ── */
+    #overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.75); z-index: 200;
+      align-items: center; justify-content: center;
+      flex-direction: column; gap: 12px;
+      font-size: 1.1rem;
+    }
+    #overlay.show { display: flex; }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 4px solid var(--border);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<header>
+  <span style="font-size:1.6rem">🃏</span>
+  <div>
+    <h1>סידור קלפים להדפסה</h1>
+    <div class="sub">העלה תמונות קלפים · בחר גדלים · הורד PDF מוכן לחיתוך</div>
+  </div>
+</header>
+
+<div class="app">
+
+  <!-- ═══ Main content ═══ -->
+  <div class="main">
+
+    <!-- Upload panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <span>📁 העלאת קלפים</span>
+        <span class="count-badge" id="imgCount" style="display:none">0</span>
+      </div>
+      <div class="panel-body">
+        <div class="upload-zone" id="uploadZone"
+             onclick="document.getElementById('fileInput').click()"
+             ondragover="onDragOver(event)"
+             ondragleave="onDragLeave()"
+             ondrop="onDrop(event)">
+          <div class="icon">📂</div>
+          <strong>לחץ לבחירת קבצים</strong>
+          <p>או גרור תמונות לכאן</p>
+          <p>PNG · JPG · WEBP</p>
+        </div>
+        <input type="file" id="fileInput" multiple accept="image/*" style="display:none"
+               onchange="handleFiles(this.files); this.value=''">
+        <div class="thumb-grid" id="thumbs"></div>
+      </div>
+    </div>
+
+    <!-- Preview panel -->
+    <div class="panel">
+      <div class="panel-header">🖨️ תצוגה מקדימה</div>
+      <div class="preview-wrap" id="previewWrap">
+        <div class="empty-state">
+          <div class="e-icon">🖨️</div>
+          <p>העלה קלפים כדי לראות את הפריסה</p>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+
+  <!-- ═══ Sidebar ═══ -->
+  <div class="sidebar">
+
+    <div class="sec-title">גודל דף</div>
+
+    <div class="fg">
+      <label>פורמט</label>
+      <select id="pageFormat" onchange="onFormatChange()">
+        <option value="a4">A4 — 21 × 29.7 ס"מ</option>
+        <option value="a3">A3 — 29.7 × 42 ס"מ</option>
+        <option value="letter">Letter — 21.6 × 27.9 ס"מ</option>
+        <option value="custom">מותאם אישית…</option>
+      </select>
+    </div>
+
+    <div id="customPage" style="display:none">
+      <div class="two">
+        <div class="fg">
+          <label>רוחב (ס"מ)</label>
+          <input type="number" id="pageW" value="21" min="5" max="200" step="0.1">
+        </div>
+        <div class="fg">
+          <label>גובה (ס"מ)</label>
+          <input type="number" id="pageH" value="29.7" min="5" max="200" step="0.1">
+        </div>
+      </div>
+    </div>
+
+    <div class="fg">
+      <label>כיוון</label>
+      <select id="orient">
+        <option value="portrait">לאורך (Portrait)</option>
+        <option value="landscape">לרוחב (Landscape)</option>
+      </select>
+    </div>
+
+    <hr class="div">
+    <div class="sec-title">גודל קלף</div>
+
+    <div class="two">
+      <div class="fg">
+        <label>רוחב (ס"מ)</label>
+        <input type="number" id="cardW" value="6.35" min="0.5" max="50" step="0.05">
+      </div>
+      <div class="fg">
+        <label>גובה (ס"מ)</label>
+        <input type="number" id="cardH" value="8.89" min="0.5" max="50" step="0.05">
+      </div>
+    </div>
+
+    <div class="fg">
+      <label>שוליים מסביב לדף (ס"מ)</label>
+      <input type="number" id="margin" value="0.5" min="0" max="10" step="0.1">
+    </div>
+
+    <div class="stats" id="stats">—</div>
+
+    <hr class="div">
+    <div class="sec-title">פעולות</div>
+
+    <button class="btn btn-green"   onclick="generatePDF()">⬇ הורד PDF</button>
+    <button class="btn btn-grey"    onclick="triggerPreview()">↺ רענן תצוגה</button>
+    <button class="btn btn-danger"  onclick="clearAll()">🗑 נקה הכל</button>
+
+    <hr class="div">
+    <div style="font-size:0.75rem; color:var(--muted); line-height:1.6">
+      <strong>טיפים:</strong><br>
+      • גודל קלף סטנדרטי: 6.35 × 8.89 ס"מ<br>
+      • ניתן לסדר מחדש בגרירה<br>
+      • Ctrl+P להדפסה ישירה מהדפדפן
+    </div>
+
+  </div><!-- /sidebar -->
+
+</div><!-- /app -->
+
+<!-- Loading overlay -->
+<div id="overlay">
+  <div class="spinner"></div>
+  <span>מייצר PDF…</span>
+</div>
+
+<script>
+const { jsPDF } = window.jspdf;
+
+let images = [];      // { dataUrl, name }
+let dragSrcIdx = null;
+
+const FORMATS = {
+  a4:     { w: 21,    h: 29.7  },
+  a3:     { w: 29.7,  h: 42    },
+  letter: { w: 21.59, h: 27.94 },
+};
+
+/* ─── Settings helpers ─────────────────────────────────── */
+
+function onFormatChange() {
+  const v = document.getElementById('pageFormat').value;
+  document.getElementById('customPage').style.display = v === 'custom' ? '' : 'none';
+  schedulePreview();
+}
+
+function getSettings() {
+  const fmt = document.getElementById('pageFormat').value;
+  let pw, ph;
+  if (fmt === 'custom') {
+    pw = parseFloat(document.getElementById('pageW').value) || 21;
+    ph = parseFloat(document.getElementById('pageH').value) || 29.7;
+  } else {
+    ({ w: pw, h: ph } = FORMATS[fmt]);
+  }
+  if (document.getElementById('orient').value === 'landscape') [pw, ph] = [ph, pw];
+  return {
+    pageW:  pw,
+    pageH:  ph,
+    cardW:  parseFloat(document.getElementById('cardW').value) || 6.35,
+    cardH:  parseFloat(document.getElementById('cardH').value) || 8.89,
+    margin: parseFloat(document.getElementById('margin').value) ?? 0.5,
+  };
+}
+
+function calcLayout(s) {
+  const cols = Math.max(1, Math.floor((s.pageW - 2 * s.margin) / s.cardW));
+  const rows = Math.max(1, Math.floor((s.pageH - 2 * s.margin) / s.cardH));
+  const startX = (s.pageW - cols * s.cardW) / 2;
+  const startY = (s.pageH - rows * s.cardH) / 2;
+  return { cols, rows, cpp: cols * rows, startX, startY };
+}
+
+/* ─── File handling ─────────────────────────────────────── */
+
+function handleFiles(files) {
+  const arr = Array.from(files).filter(f => f.type.startsWith('image/'));
+  if (!arr.length) return;
+  let done = 0;
+  arr.forEach(file => {
+    const r = new FileReader();
+    r.onload = e => {
+      images.push({ dataUrl: e.target.result, name: file.name });
+      if (++done === arr.length) { renderThumbs(); schedulePreview(); }
+    };
+    r.readAsDataURL(file);
+  });
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  document.getElementById('uploadZone').classList.add('drag-active');
+}
+function onDragLeave() {
+  document.getElementById('uploadZone').classList.remove('drag-active');
+}
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('uploadZone').classList.remove('drag-active');
+  handleFiles(e.dataTransfer.files);
+}
+
+function removeImage(idx) {
+  images.splice(idx, 1);
+  renderThumbs();
+  schedulePreview();
+}
+
+/* ─── Thumbnails ────────────────────────────────────────── */
+
+function renderThumbs() {
+  const grid  = document.getElementById('thumbs');
+  const badge = document.getElementById('imgCount');
+
+  badge.style.display = images.length ? '' : 'none';
+  badge.textContent = images.length;
+
+  grid.innerHTML = images.map((img, i) => `
+    <div class="thumb" draggable="true" data-i="${i}"
+         ondragstart="tdStart(event,${i})"
+         ondragover="tdOver(event,${i})"
+         ondrop="tdDrop(event,${i})"
+         ondragend="tdEnd()">
+      <img src="${img.dataUrl}" alt="${img.name}">
+      <button class="del" onclick="event.stopPropagation();removeImage(${i})">✕</button>
+      <span class="num">${i+1}</span>
+    </div>
+  `).join('');
+}
+
+function tdStart(e, i) {
+  dragSrcIdx = i;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+function tdOver(e, i) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.querySelectorAll('.thumb').forEach(el => el.classList.remove('drag-over'));
+  if (i !== dragSrcIdx) document.querySelector(`.thumb[data-i="${i}"]`)?.classList.add('drag-over');
+}
+function tdDrop(e, targetIdx) {
+  e.preventDefault();
+  if (dragSrcIdx == null || dragSrcIdx === targetIdx) return;
+  const [moved] = images.splice(dragSrcIdx, 1);
+  images.splice(targetIdx, 0, moved);
+  dragSrcIdx = null;
+  renderThumbs();
+  schedulePreview();
+}
+function tdEnd() {
+  dragSrcIdx = null;
+  document.querySelectorAll('.thumb').forEach(el => el.classList.remove('dragging','drag-over'));
+}
+
+function clearAll() {
+  if (images.length && !confirm('למחוק את כל הקלפים?')) return;
+  images = [];
+  renderThumbs();
+  document.getElementById('previewWrap').innerHTML = `
+    <div class="empty-state">
+      <div class="e-icon">🖨️</div>
+      <p>העלה קלפים כדי לראות את הפריסה</p>
+    </div>`;
+  document.getElementById('stats').textContent = '—';
+}
+
+/* ─── Preview ───────────────────────────────────────────── */
+
+let _previewTimer = null;
+function schedulePreview() {
+  clearTimeout(_previewTimer);
+  _previewTimer = setTimeout(renderPreview, 180);
+}
+function triggerPreview() {
+  clearTimeout(_previewTimer);
+  renderPreview();
+}
+
+async function renderPreview() {
+  const s = getSettings();
+  const L = calcLayout(s);
+
+  document.getElementById('stats').textContent =
+    `${L.cols} × ${L.rows} = ${L.cpp} קלפים לדף`;
+
+  const wrap = document.getElementById('previewWrap');
+  if (!images.length) return;
+
+  wrap.innerHTML = '<div class="empty-state"><p>טוען…</p></div>';
+
+  try {
+    const loaded = await loadImgs(images.map(im => im.dataUrl));
+    const pages  = Math.ceil(images.length / L.cpp);
+    const DPI    = 96;
+    const CPX    = DPI / 2.54;
+    const CW     = Math.round(s.pageW * CPX);
+    const CH     = Math.round(s.pageH * CPX);
+    const maxW   = Math.max(300, wrap.clientWidth - 40);
+    const scaledW = Math.min(CW, maxW);
+
+    wrap.innerHTML = '';
+
+    for (let p = 0; p < pages; p++) {
+      const canvas = document.createElement('canvas');
+      canvas.width  = CW;
+      canvas.height = CH;
+      canvas.style.width  = scaledW + 'px';
+      canvas.style.height = Math.round(CH * scaledW / CW) + 'px';
+      canvas.className = 'page-canvas';
+
+      paintPage(canvas.getContext('2d'), p, s, L, loaded, CPX);
+
+      const pw = document.createElement('div');
+      pw.className = 'page-wrap';
+      pw.appendChild(canvas);
+
+      const lbl = document.createElement('span');
+      lbl.className = 'page-lbl';
+      lbl.textContent = `עמוד ${p+1} מתוך ${pages}`;
+      pw.appendChild(lbl);
+
+      wrap.appendChild(pw);
+    }
+  } catch (err) {
+    wrap.innerHTML = `<div class="empty-state"><p>שגיאה בטעינת תמונות</p></div>`;
+    console.error(err);
+  }
+}
+
+function paintPage(ctx, pageIdx, s, L, loaded, CPX) {
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+
+  // White background
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, W, H);
+
+  const cw = s.cardW * CPX, ch = s.cardH * CPX;
+  const sx = L.startX * CPX, sy = L.startY * CPX;
+  const base = pageIdx * L.cpp;
+
+  // Card images
+  for (let r = 0; r < L.rows; r++) {
+    for (let c = 0; c < L.cols; c++) {
+      const idx = base + r * L.cols + c;
+      if (idx >= images.length) continue;
+      ctx.drawImage(loaded[idx], sx + c * cw, sy + r * ch, cw, ch);
+    }
+  }
+
+  // Cut lines — dashed, full page
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([6, 5]);
+
+  for (let c = 0; c <= L.cols; c++) {
+    const x = sx + c * cw;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let r = 0; r <= L.rows; r++) {
+    const y = sy + r * ch;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  ctx.setLineDash([]);
+}
+
+/* ─── PDF generation ────────────────────────────────────── */
+
+async function generatePDF() {
+  if (!images.length) { alert('אנא העלה קלפים קודם'); return; }
+
+  const ov = document.getElementById('overlay');
+  ov.classList.add('show');
+
+  try {
+    const s = getSettings();
+    const L = calcLayout(s);
+    const pages = Math.ceil(images.length / L.cpp);
+    const mm = cm => cm * 10;
+
+    const isLandscape = s.pageW > s.pageH;
+    const pdfOrient = isLandscape ? 'l' : 'p';
+    const pdfFmt = [mm(Math.min(s.pageW, s.pageH)), mm(Math.max(s.pageW, s.pageH))];
+
+    const doc = new jsPDF({
+      orientation: pdfOrient,
+      unit: 'mm',
+      format: pdfFmt,
+    });
+
+    for (let p = 0; p < pages; p++) {
+      if (p > 0) doc.addPage(pdfFmt, pdfOrient);
+
+      const base = p * L.cpp;
+
+      // Images
+      for (let r = 0; r < L.rows; r++) {
+        for (let c = 0; c < L.cols; c++) {
+          const idx = base + r * L.cols + c;
+          if (idx >= images.length) continue;
+          doc.addImage(
+            images[idx].dataUrl,
+            imgFmt(images[idx].dataUrl),
+            mm(L.startX + c * s.cardW),
+            mm(L.startY + r * s.cardH),
+            mm(s.cardW),
+            mm(s.cardH),
+            undefined, 'FAST'
+          );
+        }
+      }
+
+      // Cut lines
+      doc.setDrawColor(60, 60, 60);
+      doc.setLineWidth(0.15);
+      doc.setLineDashPattern([1.5, 1.5], 0);
+
+      const PW = mm(s.pageW), PH = mm(s.pageH);
+
+      for (let c = 0; c <= L.cols; c++) {
+        const x = mm(L.startX + c * s.cardW);
+        doc.line(x, 0, x, PH);
+      }
+      for (let r = 0; r <= L.rows; r++) {
+        const y = mm(L.startY + r * s.cardH);
+        doc.line(0, y, PW, y);
+      }
+    }
+
+    doc.save('cards-print.pdf');
+  } catch (err) {
+    alert('שגיאה ביצירת PDF:\n' + err.message);
+    console.error(err);
+  } finally {
+    ov.classList.remove('show');
+  }
+}
+
+/* ─── Helpers ───────────────────────────────────────────── */
+
+function loadImgs(urls) {
+  return Promise.all(urls.map(url => new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => res(img);
+    img.onerror = rej;
+    img.src = url;
+  })));
+}
+
+function imgFmt(dataUrl) {
+  if (dataUrl.startsWith('data:image/png'))  return 'PNG';
+  if (dataUrl.startsWith('data:image/webp')) return 'WEBP';
+  return 'JPEG';
+}
+
+/* ─── Init ──────────────────────────────────────────────── */
+
+document.querySelectorAll('select, input[type="number"]').forEach(el => {
+  el.addEventListener('input',  schedulePreview);
+  el.addEventListener('change', schedulePreview);
+});
+
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') generatePDF();
+});
+
+schedulePreview();
+</script>
+</body>
+</html>
