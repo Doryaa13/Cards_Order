@@ -1,0 +1,19 @@
+{
+  "id": "lab-seesaw",
+  "name": "מעבדה 1: נדנדה",
+  "notes": "The normal ball (the one that must reach the basket) drops first and settles on the low end of the seesaw; then the heavy ball from the pipe slams the high end and flings it into the basket.",
+  "world": {"width": 600, "height": 1000},
+  "launch": {"vx": 0, "vy": 0},
+  "goalBall": "goal",
+  "tray": [
+    {"id": "s", "type": "seesaw"}
+  ],
+  "solutions": [
+    {"stars": 3, "placements": {"s": {"x": 335, "y": 780, "angle": 0}}}
+  ],
+  "parts": [
+    {"type": "ball", "id": "ball", "x": 400, "y": 40, "r": 18, "heavy": true},
+    {"type": "ball", "id": "goal", "x": 262, "y": 560, "r": 16},
+    {"type": "basket", "x": 480, "y": 990, "w": 240, "h": 90}
+  ]
+}

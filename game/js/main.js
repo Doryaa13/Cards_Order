@@ -7,6 +7,7 @@
   var btnPlay = document.getElementById('btn-play');
   var btnReset = document.getElementById('btn-reset');
   var btnTower = document.getElementById('btn-tower');
+  var btnSwitch = document.getElementById('btn-switch');
   var btnNext = document.getElementById('btn-next');
   var btnEdit = document.getElementById('btn-edit');
   var titleEl = document.getElementById('level-name');
@@ -14,12 +15,23 @@
   var winEl = document.getElementById('win');
   var trayEl = document.getElementById('tray');
 
-  var SPRING_ICON = '<svg class="tray-spring" viewBox="0 0 40 26" aria-hidden="true">' +
-    '<rect x="4" y="2" width="32" height="5" rx="1.5"/>' +
-    '<polyline points="8,9 32,12 8,15 32,18 8,21" fill="none" stroke-width="2.2"/>' +
-    '<rect x="4" y="21" width="32" height="4" rx="1.5"/></svg>';
+  // Tray button pictures for parts that are not plain ramps
+  var ICONS = {
+    spring: { label: 'קפיץ, נגיעה אחת בכל ריצה', badge: true, svg:
+      '<rect x="4" y="2" width="32" height="5" rx="1.5"/>' +
+      '<polyline points="8,9 32,12 8,15 32,18 8,21" fill="none" stroke-width="2.2"/>' +
+      '<rect x="4" y="21" width="32" height="4" rx="1.5"/>' },
+    funnel: { label: 'משפך', svg:
+      '<polyline points="3,3 17,22 23,22 37,3" fill="none" stroke-width="3.5" stroke-linejoin="round"/>' },
+    seesaw: { label: 'נדנדה', svg:
+      '<rect x="2" y="8" width="36" height="4" rx="1.5" transform="rotate(-12 20 10)"/>' +
+      '<polygon points="20,11 13,24 27,24" stroke="none"/>' },
+    dominoes: { label: 'שורת דומינו', svg:
+      '<rect x="5" y="3" width="4" height="20" rx="1"/><rect x="14" y="3" width="4" height="20" rx="1"/>' +
+      '<rect x="23" y="3" width="4" height="20" rx="1"/><rect x="32" y="3" width="4" height="20" rx="1"/>' }
+  };
 
-  var levels, progress, tower;
+  var towers, towerIndex = 0, towerData, levels, progress, tower;
   // view: 'tower' or 'floor'. mode (inside a floor): 'edit', 'run' or 'done'.
   var view = null, mode = null;
   var floorIndex = 0, level = null, trayItems = [];
@@ -59,6 +71,14 @@
     canvas.height = Math.floor(H * scale * sz.dpr);
   }
 
+  // Switches which tower is shown: the main tower or the lab
+  function useTower(i) {
+    towerIndex = i;
+    towerData = towers[i];
+    levels = towerData.floors;
+    tower = ChainTower.create({ tower: towerData, progress: progress, getSize: stageSize });
+  }
+
   function totalStars() {
     return levels.reduce(function (sum, l) { return sum + progress.stars(l.id); }, 0);
   }
@@ -72,11 +92,13 @@
     editor.setEnabled(false);
     document.body.classList.add('in-tower');
     winEl.hidden = true;
-    titleEl.textContent = 'המגדל · ★ ' + totalStars() + ' מתוך ' + levels.length * 3;
+    titleEl.textContent = towerData.name + ' · ★ ' + totalStars() + ' מתוך ' + levels.length * 3;
     btnTower.hidden = true;
+    btnSwitch.hidden = towers.length < 2;
+    btnSwitch.textContent = towers[(towerIndex + 1) % towers.length].name;
     btnReset.hidden = true;
     btnPlay.disabled = false;
-    btnPlay.textContent = '▶ לקומה ' + (progress.currentIndex(levels) + 1);
+    btnPlay.textContent = '▶ לקומה ' + (progress.currentIndex(towerData) + 1);
     trayEl.classList.remove('locked', 'drop');
     trayEl.innerHTML = '<p class="tray-empty">' + trayText + '</p>';
     statusEl.textContent = ' ';
@@ -87,7 +109,7 @@
   // Shows the tower. intro: the opening shot (whole tower, then down into the current floor).
   // Otherwise the camera zooms out from the floor just left, and the player picks a floor.
   function showTower(intro) {
-    var cur = progress.currentIndex(levels);
+    var cur = progress.currentIndex(towerData);
     towerChrome(intro ? 'נגיעה מדלגת' : 'געו בקומה כדי לשחק בה. גררו כדי לגלול');
     if (intro) {
       tower.setCamera(tower.towerCamera());
@@ -128,7 +150,7 @@
   function onTowerTap(e) {
     var i = tower.floorAt(e.clientX, e.clientY, canvas.getBoundingClientRect());
     if (i < 0) return;
-    if (!progress.unlocked(levels, i)) {
+    if (!progress.unlocked(towerData, i)) {
       statusEl.textContent = 'קומה ' + (i + 1) + ' נעולה. השיגו כוכב בקומה שמעליה כדי לפתוח אותה';
       return;
     }
@@ -155,6 +177,7 @@
     document.body.classList.remove('in-tower');
     titleEl.textContent = level.name;
     btnTower.hidden = false;
+    btnSwitch.hidden = true;
     btnReset.hidden = false;
     btnPlay.textContent = '▶ הפעל';
     resize();
@@ -174,9 +197,11 @@
       if (onBoard[item.id]) return;
       var btn = document.createElement('button');
       btn.className = 'tray-item';
-      if (item.type === 'spring') {
-        btn.setAttribute('aria-label', 'קפיץ, נגיעה אחת בכל ריצה');
-        btn.innerHTML = SPRING_ICON + '<span class="tray-badge">1</span>';
+      var icon = ICONS[item.type];
+      if (icon) {
+        btn.setAttribute('aria-label', icon.label);
+        btn.innerHTML = '<svg class="tray-icon" viewBox="0 0 40 26" aria-hidden="true">' + icon.svg + '</svg>' +
+          (icon.badge ? '<span class="tray-badge">1</span>' : '');
       } else {
         btn.setAttribute('aria-label', 'רמפה באורך ' + item.w);
         var bar = document.createElement('span');
@@ -209,7 +234,7 @@
 
   // Back to edit mode with the player's arrangement
   function edit() {
-    game = ChainWorld.buildWorld(Matter, level, placements);
+    game = ChainWorld.buildWorld(Matter, level, placements, { edit: true });
     editor.setGame(game);
     editor.setEnabled(true);
     mode = 'edit';
@@ -251,13 +276,15 @@
 
   function play() {
     if (view === 'tower') {
-      if (!tower.skip()) flyToFloor(progress.currentIndex(levels));
+      if (!tower.skip()) flyToFloor(progress.currentIndex(towerData));
       return;
     }
     if (mode !== 'edit' || btnPlay.disabled) return;
     placements = editor.placements();
     progress.saveDraft(level.id, placements);
     editor.setEnabled(false);
+    // The run gets its own world: seesaws on their pivots, domino rows as separate dominoes
+    game = ChainWorld.buildWorld(Matter, level, placements);
     mode = 'run';
     lastRunText = null;
     btnPlay.disabled = true;
@@ -307,7 +334,7 @@
     lastTime = now;
     if (view === 'tower') {
       tower.update(now);
-      if (view === 'tower') tower.draw(ctx, progress.currentIndex(levels));
+      if (view === 'tower') tower.draw(ctx, progress.currentIndex(towerData));
     }
     if (view === 'floor') {
       if (mode === 'run') {
@@ -330,6 +357,13 @@
   btnPlay.addEventListener('click', play);
   btnReset.addEventListener('click', onResetClick);
   btnTower.addEventListener('click', function () { if (view === 'floor') showTower(false); });
+  btnSwitch.addEventListener('click', function () {
+    if (view !== 'tower') return;
+    useTower((towerIndex + 1) % towers.length);
+    towerChrome('געו בקומה כדי לשחק בה. גררו כדי לגלול');
+    tower.setCamera(tower.towerCamera());
+    tower.animate([tower.menuCamera(progress.currentIndex(towerData))], 900);
+  });
   btnNext.addEventListener('click', goToNextFloor);
   // Back to editing with the arrangement that just won, to improve on it
   btnEdit.addEventListener('click', edit);
@@ -344,9 +378,9 @@
   }
 
   ChainLevels.load().then(function (loaded) {
-    levels = loaded;
+    towers = loaded;
     progress = ChainProgress.create();
-    tower = ChainTower.create({ levels: levels, progress: progress, getSize: stageSize });
+    useTower(0);
     showTower(true);
     requestAnimationFrame(frame);
   }).catch(function (err) {

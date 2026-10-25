@@ -9,21 +9,100 @@
   var SPRING_KICK = 22;        // speed added along the spring's facing direction when it fires
   var SPRING_REACH = 40;       // how far above its pad the spring still catches things
 
-  // A part from the tray, placed on the board by the player.
-  // Springs fire once when the player taps them during a run.
-  function makeTrayBody(Matter, item, x, y, angleDeg) {
-    var spring = item.type === 'spring';
-    if (spring) item = Object.assign({ w: SPRING_W, h: SPRING_H, tappable: true }, item);
-    var body = Matter.Bodies.rectangle(x, y, item.w, item.h, {
-      isStatic: true, angle: (angleDeg || 0) * deg, friction: spring ? 0.9 : 0.6
+  var FUNNEL_W = 170, FUNNEL_H = 90, FUNNEL_GAP = 44, FUNNEL_T = 12;
+  var SEESAW_W = 220, SEESAW_H = 14, SEESAW_MAX = 30;   // a seesaw rocks between -30 and +30 degrees
+  var ROW_SPACING = 34;
+
+  // Fills in the size of tray parts whose size is fixed by their type
+  function trayItem(item) {
+    var sizes = {
+      spring: { w: SPRING_W, h: SPRING_H, tappable: true },
+      funnel: { w: FUNNEL_W, h: FUNNEL_H, gap: FUNNEL_GAP },
+      seesaw: { w: SEESAW_W, h: SEESAW_H, maxAngle: SEESAW_MAX },
+      dominoes: { w: ((item.count || 4) - 1) * ROW_SPACING + DOMINO_W, h: DOMINO_H, fixedAngle: true, snapDown: true }
+    };
+    return Object.assign({ tray: true }, sizes[item.type] || {}, item);
+  }
+
+  // A part from the tray, placed on the board by the player. Returns the bodies to add to the world.
+  // forRun: build what physics needs during a run. Otherwise the editing version: one solid,
+  // unmoving body per tray part, which is what the editor drags around.
+  //   spring    fires once when the player taps it during a run
+  //   funnel    two walls in a V with an opening at the bottom
+  //   seesaw    a plank on a pivot at its middle; during a run it tips, between its stops
+  //   dominoes  a row of dominoes; during a run each one stands on its own
+  function makeTrayBodies(Matter, item, x, y, angleDeg, forRun) {
+    item = trayItem(item);
+    var Bodies = Matter.Bodies, Body = Matter.Body;
+    var angle = (angleDeg || 0) * deg;
+    var tag = function (b) { b.render.kind = item.type; b.plugin.part = item; return b; };
+
+    if (item.type === 'funnel') {
+      // Each wall runs from a top corner down to the edge of the opening. Its center line stops a
+      // little outside the opening so the wall's thickness does not narrow it.
+      var inner = item.gap / 2 + FUNNEL_T * 0.8, run = item.w / 2 - inner, slope = Math.atan2(item.h, run);
+      var len = Math.hypot(item.h, run) + FUNNEL_T, mid = inner + run / 2;
+      var left = Bodies.rectangle(-mid, 0, len, FUNNEL_T, { angle: slope });
+      var right = Bodies.rectangle(mid, 0, len, FUNNEL_T, { angle: -slope });
+      // An invisible sensor in the throat, so a ball dropping cleanly through still counts as a touch
+      var throat = Bodies.rectangle(0, item.h / 2 - FUNNEL_T, item.gap, FUNNEL_T, { isSensor: true });
+      var funnel = Body.create({ parts: [left, right, throat], isStatic: true, friction: 0.3 });
+      Body.setPosition(funnel, { x: x, y: y });
+      Body.setAngle(funnel, angle);
+      return [tag(funnel)];
+    }
+
+    if (item.type === 'dominoes' && forRun) {
+      var n = item.count || 4;
+      var bodies = [];
+      for (var i = 0; i < n; i++) {
+        bodies.push(tag(Bodies.rectangle(x + (i - (n - 1) / 2) * ROW_SPACING, y, DOMINO_W, DOMINO_H, {
+          friction: 0.1, frictionStatic: 0.5, restitution: 0, density: 0.004
+        })));
+      }
+      return bodies;
+    }
+    if (item.type === 'dominoes') {
+      var m = item.count || 4, pieces = [];
+      for (var j = 0; j < m; j++) pieces.push(Bodies.rectangle((j - (m - 1) / 2) * ROW_SPACING, 0, DOMINO_W, DOMINO_H));
+      var row = Body.create({ parts: pieces, isStatic: true });
+      Body.setPosition(row, { x: x, y: y });
+      return [tag(row)];
+    }
+
+    if (item.type === 'seesaw') {
+      // A plank with a small lip at each end, so a ball sitting on the low end stays there
+      var lip = 10, lipH = item.h + 14;
+      var board = Bodies.rectangle(0, 0, item.w, item.h);
+      var lipL = Bodies.rectangle(-item.w / 2 + lip / 2, -(lipH - item.h) / 2, lip, lipH);
+      var lipR = Bodies.rectangle(item.w / 2 - lip / 2, -(lipH - item.h) / 2, lip, lipH);
+      var plank = Body.create(forRun
+        ? { parts: [board, lipL, lipR], density: 0.002, friction: 0.6, frictionAir: 0.02 }
+        : { parts: [board, lipL, lipR], isStatic: true });
+      // Keep the pivot at the middle of the board, not at the centre of mass the lips shift upward
+      var shift = { x: plank.position.x - board.position.x, y: plank.position.y - board.position.y };
+      Body.setPosition(plank, { x: x + shift.x, y: y + shift.y });
+      Body.rotate(plank, angle, { x: x, y: y });
+      tag(plank);
+      if (forRun) plank.plugin.pivot = { x: x, y: y, max: item.maxAngle * deg, offset: shift };
+      return [plank];
+    }
+
+    var body = Bodies.rectangle(x, y, item.w, item.h, {
+      isStatic: true, angle: angle, friction: item.type === 'spring' ? 0.9 : 0.6
     });
-    body.render.kind = item.type;
-    body.plugin.part = Object.assign({ tray: true }, item);
-    return body;
+    return [tag(body)];
+  }
+
+  // The editing body of a tray part (one per part)
+  function makeTrayBody(Matter, item, x, y, angleDeg) {
+    return makeTrayBodies(Matter, item, x, y, angleDeg, false)[0];
   }
 
   // placements: { trayItemId: { x, y, angle } } for the tray parts the player put on the board.
-  function buildWorld(Matter, level, placements) {
+  // opts.edit: build tray parts in their editing form (see makeTrayBodies); otherwise ready to run.
+  function buildWorld(Matter, level, placements, opts) {
+    var forRun = !(opts && opts.edit);
     var Bodies = Matter.Bodies, Composite = Matter.Composite;
     var engine = Matter.Engine.create({ positionIterations: 12, velocityIterations: 10 });
     engine.gravity.y = 1; engine.gravity.scale = 0.0018;
@@ -49,8 +128,9 @@
           angle: angle, friction: 0.1, frictionStatic: 0.5, restitution: 0, density: 0.004
         }), part);
       } else if (p.type === 'ball') {
+        // A heavy ball weighs four times as much: enough to tip a seesaw and fling a normal ball
         add(Bodies.circle(p.x, p.y, p.r || 16, {
-          friction: 0.02, frictionAir: 0.002, restitution: 0.2, density: 0.002
+          friction: 0.02, frictionAir: 0.002, restitution: 0.2, density: p.heavy ? 0.008 : 0.002
         }), part);
       } else if (p.type === 'basket') {
         var x0 = p.x - p.w / 2, x1 = p.x + p.w / 2, top = p.y - p.h;
@@ -72,18 +152,46 @@
       Bodies.rectangle(W + 25, H / 2, 50, H * 2, bounds)
     ].forEach(function (b) { b.render.kind = 'bound'; Composite.add(engine.world, b); });
 
+    var pivots = [];
     (level.tray || []).forEach(function (item) {
       var at = placements && placements[item.id];
-      if (at) Composite.add(engine.world, makeTrayBody(Matter, item, at.x, at.y, at.angle));
+      if (!at) return;
+      makeTrayBodies(Matter, item, at.x, at.y, at.angle, forRun).forEach(function (b) {
+        Composite.add(engine.world, b);
+        if (b.plugin.pivot) {
+          pivots.push(b);
+          var pv = b.plugin.pivot;
+          Composite.add(engine.world, Matter.Constraint.create({
+            pointA: { x: pv.x, y: pv.y }, bodyB: b, length: 0, stiffness: 1,
+            pointB: { x: pv.x - b.position.x, y: pv.y - b.position.y }
+          }));
+        }
+      });
     });
 
     var game = { engine: engine, byId: byId, goal: goal, level: level, width: W, height: H, touched: {} };
 
-    // A tray part lights up when the ball or any other moving piece hits it during the run
+    // A seesaw rocks between stops on either side of level
+    if (pivots.length) {
+      Matter.Events.on(engine, 'afterUpdate', function () {
+        pivots.forEach(function (b) {
+          // Only motion further past a stop is cancelled; a push back toward level is kept
+          var max = b.plugin.pivot.max, side = Math.sign(b.angle);
+          if (Math.abs(b.angle) > max) {
+            var spin = b.angularVelocity;
+            Matter.Body.setAngle(b, side * max);
+            Matter.Body.setAngularVelocity(b, Math.sign(spin) === side ? 0 : spin);
+          }
+        });
+      });
+    }
+
+    // A tray part lights up when the ball or any other moving piece hits it during the run.
+    // Collisions report the parts of compound bodies, so look at the parent body.
     Matter.Events.on(engine, 'collisionStart', function (e) {
       if (!game.started) return;
       e.pairs.forEach(function (pair) {
-        [[pair.bodyA, pair.bodyB], [pair.bodyB, pair.bodyA]].forEach(function (ab) {
+        [[pair.bodyA.parent, pair.bodyB.parent], [pair.bodyB.parent, pair.bodyA.parent]].forEach(function (ab) {
           var part = ab[0].plugin.part, other = ab[1];
           if (part && part.tray && !other.isStatic && other.speed > TOUCH_MIN_SPEED) game.touched[part.id] = true;
         });
@@ -118,6 +226,12 @@
     }
   }
 
+  // The ball that has to end up in the basket: usually the one that starts the run, but in a relay
+  // the starting ball knocks another ball (level.goalBall) on its way
+  function goalBall(game) {
+    return game.byId[game.level.goalBall || 'ball'];
+  }
+
   var ALLOWED_DEPTH = 1.5;     // parts may touch, but not overlap
 
   // True when a placed part is fully on the board and does not overlap anything else
@@ -125,13 +239,17 @@
     var b = body.bounds;
     if (b.min.x < 0 || b.min.y < 0 || b.max.x > game.width || b.max.y > game.height) return false;
     var others = Matter.Composite.allBodies(game.engine.world).filter(function (o) { return o !== body; });
-    return !Matter.Query.collides(body, others).some(function (c) { return c.depth > ALLOWED_DEPTH; });
+    var pieces = (body.parts.length > 1 ? body.parts.slice(1) : [body]).filter(function (p) { return !p.isSensor; });
+    return pieces.every(function (piece) {
+      return !Matter.Query.collides(piece, others).some(function (c) { return c.depth > ALLOWED_DEPTH; });
+    });
   }
 
   // Fires a spring: everything resting on (or just above) its pad is launched the way the pad faces.
-  // Only one tap per run.
+  // Each spring has one charge per run.
   function fireSpring(Matter, game, spring) {
-    if (game.tapUsed) return false;
+    if (spring.plugin.used) return false;
+    spring.plugin.used = true;
     game.tapUsed = true;
     spring.plugin.firedAt = game.steps || 0;
     var a = spring.angle, part = spring.plugin.part;
@@ -150,13 +268,13 @@
 
   // True while the player can still change the run with a tap
   function tapAvailable(Matter, game) {
-    return !game.tapUsed && Matter.Composite.allBodies(game.engine.world).some(function (b) {
-      return b.plugin.part && b.plugin.part.tappable;
+    return Matter.Composite.allBodies(game.engine.world).some(function (b) {
+      return b.plugin.part && b.plugin.part.tappable && !b.plugin.used;
     });
   }
 
   function ballInGoal(game) {
-    var ball = game.byId.ball, g = game.goal;
+    var ball = goalBall(game), g = game.goal;
     if (!ball || !g) return false;
     var p = ball.position;
     return p.x > g.x0 && p.x < g.x1 && p.y > g.y0 && p.y < g.y1;
@@ -168,7 +286,7 @@
   // or nothing at all moves for two seconds (the chain broke), or the run passes 40 seconds.
   // While a tap is still available the game waits longer, since the player may be about to use it.
   function checkOutcome(Matter, game) {
-    var ball = game.byId.ball, p = ball.position;
+    var ball = goalBall(game), p = ball.position;
     game.steps = (game.steps || 0) + 1;
     if (!game.ballStart) game.ballStart = { x: p.x, y: p.y };
     if (ballInGoal(game)) {
@@ -198,7 +316,8 @@
   }
 
   var api = {
-    buildWorld: buildWorld, makeTrayBody: makeTrayBody, startChain: startChain, ballInGoal: ballInGoal,
+    buildWorld: buildWorld, makeTrayBody: makeTrayBody, trayItem: trayItem, startChain: startChain,
+    ballInGoal: ballInGoal, goalBall: goalBall,
     fireSpring: fireSpring, tapAvailable: tapAvailable, placementOk: placementOk,
     checkOutcome: checkOutcome, score: score, STEP_MS: 1000 / 60
   };

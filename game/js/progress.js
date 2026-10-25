@@ -44,16 +44,18 @@
         save();
       },
 
-      // Floor i is open once the floor above it has at least one star
-      unlocked: function (levels, i) { return i === 0 || this.stars(levels[i - 1].id) > 0; },
+      // Floor i of a tower is open once the floor above it has at least one star.
+      // An open tower (the lab) has every floor open from the start.
+      unlocked: function (tower, i) { return tower.open || i === 0 || this.stars(tower.floors[i - 1].id) > 0; },
 
-      // Where to play next: the first open floor without stars, else the last floor
-      currentIndex: function (levels) {
-        for (var i = 0; i < levels.length; i++) {
-          if (!this.unlocked(levels, i)) return i - 1;
-          if (!this.stars(levels[i].id)) return i;
+      // Where to play next in a tower: the first open floor without stars, else the last floor
+      currentIndex: function (tower) {
+        var floors = tower.floors;
+        for (var i = 0; i < floors.length; i++) {
+          if (!this.unlocked(tower, i)) return i - 1;
+          if (!this.stars(floors[i].id)) return i;
         }
-        return levels.length - 1;
+        return floors.length - 1;
       }
     };
   }

@@ -1,0 +1,20 @@
+{
+  "id": "lab-dominoes",
+  "name": "מעבדה 3: שורת דומינו",
+  "notes": "the ball drops straight down from the pipe. Stand the row of seven dominoes so the ball lands on the first one; the chain runs along the shelf and the last domino tips the other ball, waiting right at the edge, down into the basket. The row drops onto the surface under it when let go.",
+  "world": {"width": 600, "height": 1000},
+  "launch": {"vx": 0, "vy": 0},
+  "goalBall": "goal",
+  "tray": [
+    {"id": "d", "type": "dominoes", "count": 7}
+  ],
+  "solutions": [
+    {"stars": 3, "placements": {"d": {"x": 290, "y": 560, "angle": 0}}}
+  ],
+  "parts": [
+    {"type": "ball", "id": "ball", "x": 200, "y": 40, "r": 16},
+    {"type": "wall", "x": 244, "y": 600, "w": 488, "h": 16},
+    {"type": "ball", "id": "goal", "x": 482, "y": 576, "r": 16},
+    {"type": "basket", "x": 510, "y": 990, "w": 180, "h": 90}
+  ]
+}

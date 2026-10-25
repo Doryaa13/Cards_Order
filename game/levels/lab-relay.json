@@ -1,0 +1,21 @@
+{
+  "id": "lab-relay",
+  "name": "מעבדה 4: שרשרת כדורים",
+  "notes": "A heavy ball comes down the right side. Two ramps zigzag it onto the shelf, where it knocks the light ball off the far end into the basket.",
+  "world": {"width": 600, "height": 1000},
+  "launch": {"vx": -0.5, "vy": 0},
+  "goalBall": "goal",
+  "tray": [
+    {"id": "a", "type": "wall", "w": 240, "h": 16},
+    {"id": "b", "type": "wall", "w": 180, "h": 16}
+  ],
+  "solutions": [
+    {"stars": 3, "placements": {"a": {"x": 430, "y": 200, "angle": 20}, "b": {"x": 500, "y": 470, "angle": 155}}}
+  ],
+  "parts": [
+    {"type": "ball", "id": "ball", "x": 510, "y": 40, "r": 18, "heavy": true},
+    {"type": "wall", "x": 270, "y": 600, "w": 300, "h": 16},
+    {"type": "ball", "id": "goal", "x": 200, "y": 576, "r": 16},
+    {"type": "basket", "x": 90, "y": 990, "w": 180, "h": 90}
+  ]
+}

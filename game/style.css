@@ -52,7 +52,7 @@ body {
 }
 .bar h1 { font-size: 1.05rem; font-weight: 700; text-align: center; }
 .btn.small { min-height: 36px; padding: 0 12px; font-size: 0.9rem; }
-#btn-tower { position: absolute; inset-inline-end: 0; }
+#btn-tower, #btn-switch { position: absolute; inset-inline-end: 0; }
 .dock {
   padding-top: 6px;
   padding-bottom: max(12px, env(safe-area-inset-bottom));
@@ -159,7 +159,7 @@ body {
   cursor: grab;
   touch-action: none;
 }
-.tray-spring { width: 34px; height: 22px; fill: var(--part); stroke: var(--part); }
+.tray-icon { width: 34px; height: 22px; fill: var(--part); stroke: var(--part); }
 .tray-badge {
   position: absolute;
   top: -7px;

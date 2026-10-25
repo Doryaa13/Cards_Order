@@ -1,6 +1,25 @@
-[
-  "floor1.json",
-  "floor2.json",
-  "floor3.json",
-  "floor4.json"
-]
+{
+  "towers": [
+    {
+      "id": "tower1",
+      "name": "מגדל 1",
+      "floors": [
+        "floor1.json",
+        "floor2.json",
+        "floor3.json",
+        "floor4.json"
+      ]
+    },
+    {
+      "id": "lab",
+      "name": "המעבדה",
+      "open": true,
+      "floors": [
+        "lab-seesaw.json",
+        "lab-funnel.json",
+        "lab-dominoes.json",
+        "lab-relay.json"
+      ]
+    }
+  ]
+}

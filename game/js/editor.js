@@ -64,12 +64,29 @@
       }
       return {
         r: r,
-        rotate: pick([axis, axis + Math.PI], long / 2 + gap + r),
+        // Parts that always stand upright (a domino row) have no rotate handle
+        rotate: part.fixedAngle ? null : pick([axis, axis + Math.PI], long / 2 + gap + r),
         move: pick([axis + Math.PI / 2, axis - Math.PI / 2], thick / 2 + gap + r)
       };
     }
 
     function placementOk(body) { return ChainWorld.placementOk(Matter, game, body); }
+
+    // Lowers a part that must stand on something (a domino row) onto the first surface below it,
+    // so it does not drop when the run starts. Leaves it where it is if nothing is close below.
+    var SNAP_REACH = 160;
+    function snapDown(body) {
+      var start = { x: body.position.x, y: body.position.y };
+      for (var d = 1; d <= SNAP_REACH; d++) {
+        Matter.Body.setPosition(body, { x: start.x, y: start.y + d });
+        if (!placementOk(body)) {
+          // Back off a little so it rests just above the surface rather than touching it
+          Matter.Body.setPosition(body, { x: start.x, y: start.y + Math.max(0, d - 2) });
+          return;
+        }
+      }
+      Matter.Body.setPosition(body, start);
+    }
 
     // Shift a part that pokes past an edge back onto the board, so it slides along the edge
     function keepOnBoard(body) {
@@ -105,7 +122,7 @@
       // but squarely on another part, the other part wins (a handle can sit over a neighbour).
       if (selected) {
         var hs = handlesFor(selected);
-        var dr = Math.hypot(p.x - hs.rotate.x, p.y - hs.rotate.y);
+        var dr = hs.rotate ? Math.hypot(p.x - hs.rotate.x, p.y - hs.rotate.y) : Infinity;
         var dm = Math.hypot(p.x - hs.move.x, p.y - hs.move.y);
         var reach = HANDLE_HIT_PX / opts.getScale();
         var onOtherPart = hit && hit !== selected && best === 0;
@@ -149,7 +166,14 @@
         apply(body, { x: p.x + drag.dx, y: p.y + drag.dy }, body.angle, !overTray);
       } else {
         var a = Math.atan2(p.y - body.position.y, p.x - body.position.x) - drag.offset;
-        apply(body, body.position, Math.round(a / ROTATE_SNAP) * ROTATE_SNAP, true);
+        a = Math.round(a / ROTATE_SNAP) * ROTATE_SNAP;
+        // Parts with a limited swing (a seesaw) only turn within it
+        var max = body.plugin.part.maxAngle;
+        if (max) {
+          a = Math.atan2(Math.sin(a), Math.cos(a));
+          a = Math.max(-max * deg, Math.min(max * deg, a));
+        }
+        apply(body, body.position, a, true);
       }
       opts.onChange();
     }
@@ -164,6 +188,9 @@
       } else if (invalid) {
         Matter.Body.setPosition(drag.body, { x: v.x, y: v.y });
         Matter.Body.setAngle(drag.body, v.angle);
+      }
+      if (drag.body.plugin.part && drag.body.plugin.part.snapDown && game.engine.world.bodies.indexOf(drag.body) >= 0) {
+        snapDown(drag.body);
       }
       invalid = false;
       overTray = false;
@@ -202,7 +229,7 @@
         if (!enabled || !selected) return;
         var hs = handlesFor(selected), c = selected.position, r = hs.r, k = 1 / opts.getScale();
         var color = invalid ? colors.invalid : colors.handle;
-        [hs.rotate, hs.move].forEach(function (h) {
+        [hs.rotate, hs.move].filter(Boolean).forEach(function (h) {
           ctx.strokeStyle = color;
           ctx.lineWidth = 2 * k;
           ctx.setLineDash([4 * k, 4 * k]);
@@ -225,15 +252,17 @@
 
         // Rotate icon: an open circle with an arrow head
         var R = hs.rotate, ri = r * 0.5;
-        ctx.beginPath();
-        ctx.arc(R.x, R.y, ri, -0.3, Math.PI * 1.35);
-        ctx.stroke();
-        var ax = R.x + Math.cos(-0.3) * ri, ay = R.y + Math.sin(-0.3) * ri;
-        ctx.beginPath();
-        ctx.moveTo(ax - 4 * k, ay - 1 * k);
-        ctx.lineTo(ax, ay);
-        ctx.lineTo(ax + 1.5 * k, ay - 4.5 * k);
-        ctx.stroke();
+        if (R) {
+          ctx.beginPath();
+          ctx.arc(R.x, R.y, ri, -0.3, Math.PI * 1.35);
+          ctx.stroke();
+          var ax = R.x + Math.cos(-0.3) * ri, ay = R.y + Math.sin(-0.3) * ri;
+          ctx.beginPath();
+          ctx.moveTo(ax - 4 * k, ay - 1 * k);
+          ctx.lineTo(ax, ay);
+          ctx.lineTo(ax + 1.5 * k, ay - 4.5 * k);
+          ctx.stroke();
+        }
 
         // Move icon: four arrows
         var M = hs.move, mi = r * 0.55, hd = 3.5 * k;

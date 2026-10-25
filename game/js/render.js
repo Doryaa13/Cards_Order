@@ -6,7 +6,7 @@
     ball: '#d63c3c', basket: '#8a5a2b', goal: 'rgba(60,154,95,0.18)',
     movable: '#7a4fc4', handle: '#7a4fc4', invalid: '#d63c3c', selected: '#fff', touched: '#1fa36f',
     charge: '#e0662f', spent: '#9a948a', pipe: '#8d8578', pipeEdge: '#6f685d',
-    silhouetteSky: '#e7e1d6', silhouette: '#cfc7b9'
+    silhouetteSky: '#e7e1d6', silhouette: '#cfc7b9', otherBall: '#3a6ea5', heavyRim: '#1d3550'
   };
   var PIPE_W = 44;
 
@@ -22,12 +22,17 @@
     var editor = view.editor;
     var px = function (n) { return n / view.scale; };
 
+    // Outline of a body; for a compound body (funnel, seesaw, domino row) each visible piece
     function tracePath(body) {
-      var v = body.vertices;
+      var pieces = body.parts.length > 1 ? body.parts.slice(1) : [body];
       ctx.beginPath();
-      ctx.moveTo(v[0].x, v[0].y);
-      for (var i = 1; i < v.length; i++) ctx.lineTo(v[i].x, v[i].y);
-      ctx.closePath();
+      pieces.forEach(function (piece) {
+        if (piece.isSensor) return;
+        var v = piece.vertices;
+        ctx.moveTo(v[0].x, v[0].y);
+        for (var i = 1; i < v.length; i++) ctx.lineTo(v[i].x, v[i].y);
+        ctx.closePath();
+      });
     }
 
     function drawBody(body, fill) {
@@ -96,7 +101,7 @@
         ctx.lineTo(i % 2 ? w / 2 - 10 : -w / 2 + 10, y);
       }
       ctx.stroke();
-      var charged = !game.tapUsed;
+      var charged = !body.plugin.used;
       if (mode === 'run' && charged) {
         var pulse = 0.5 + 0.5 * Math.sin(performance.now() / 180);
         ctx.strokeStyle = 'rgba(224,102,47,' + (0.35 + 0.5 * pulse) + ')';
@@ -112,9 +117,22 @@
       if (fired < 60) drawCallout(body, 'נוצל', 1 - fired / 60);
     }
 
+    // The stand a seesaw pivots on: a triangle under the middle of the plank
+    function drawSeesawStand(body, fill) {
+      var p = body.plugin.pivot || body.position;
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x - 18, p.y + 34);
+      ctx.lineTo(p.x + 18, p.y + 34);
+      ctx.closePath();
+      ctx.fill();
+    }
+
     // Tray parts are purple with grip dots, and turn green once something hits them during a run
     function drawTrayPart(body) {
       var id = body.plugin.part.id;
+      if (body.plugin.part.type === 'seesaw') drawSeesawStand(body, view.silhouette ? COLORS.silhouette : COLORS.wall);
       var bad = editor && editor.isInvalid(body);
       var selected = editor && editor.isSelected(body);
       var hit = game.touched[id];
@@ -153,12 +171,20 @@
       }
     }
 
+    // The ball that has to reach the basket is red; other balls are blue. A heavy ball has a dark rim.
     function drawBall(b, fill) {
       ctx.beginPath();
       ctx.arc(b.position.x, b.position.y, b.circleRadius, 0, Math.PI * 2);
       ctx.fillStyle = fill;
       ctx.fill();
       if (view.silhouette) return;
+      if (b.plugin.part.heavy) {
+        ctx.strokeStyle = COLORS.heavyRim;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(b.position.x, b.position.y, b.circleRadius - 2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
       // A highlight line so rolling is visible
       ctx.strokeStyle = 'rgba(255,255,255,0.7)';
       ctx.lineWidth = 3;
@@ -195,7 +221,7 @@
         return;
       }
       if (tray) drawTrayPart(b);
-      else if (kind === 'ball') drawBall(b, COLORS.ball);
+      else if (kind === 'ball') drawBall(b, b.plugin.part.id === (game.level.goalBall || 'ball') ? COLORS.ball : COLORS.otherBall);
       else if (kind === 'domino') drawBody(b, COLORS.domino[dominoIndex++ % COLORS.domino.length]);
       else if (kind === 'basket') drawBody(b, COLORS.basket);
       else drawBody(b, COLORS.wall);
@@ -206,7 +232,7 @@
 
   // The short pipe the ball comes out of at the top of floors fed by the floor above
   function drawEntryPipe(ctx, game, silhouette) {
-    var ball = game.level.parts.filter(function (p) { return p.type === 'ball'; })[0];
+    var ball = game.level.parts.filter(function (p) { return p.id === 'ball'; })[0];
     var x = ball.x, bottom = ball.y - (ball.r || 16) + 4;
     ctx.fillStyle = silhouette ? COLORS.silhouette : COLORS.pipe;
     ctx.fillRect(x - PIPE_W / 2, 0, PIPE_W, bottom);

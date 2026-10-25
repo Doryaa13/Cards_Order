@@ -8,8 +8,9 @@ var ChainWorld = require(path.join(__dirname, '../js/world.js'));
 
 var fs = require('fs');
 var levelDir = path.join(__dirname, '../levels');
-var levels = JSON.parse(fs.readFileSync(path.join(levelDir, 'index.json'), 'utf8')).map(function (f) {
-  return JSON.parse(fs.readFileSync(path.join(levelDir, f), 'utf8'));
+var levels = [];
+JSON.parse(fs.readFileSync(path.join(levelDir, 'index.json'), 'utf8')).towers.forEach(function (tower) {
+  tower.floors.forEach(function (f) { levels.push(JSON.parse(fs.readFileSync(path.join(levelDir, f), 'utf8'))); });
 });
 
 function run(level, placements, tap) {
@@ -33,7 +34,7 @@ function run(level, placements, tap) {
     Matter.Engine.update(game.engine, ChainWorld.STEP_MS);
     outcome = ChainWorld.checkOutcome(Matter, game);
   }
-  var b = game.byId.ball.position;
+  var b = ChainWorld.goalBall(game).position;
   var stars = outcome === 'win' ? ChainWorld.score(game).stars : 0;
   return { outcome: stars ? stars + ' stars' : 'fail', seconds: (t / 60).toFixed(2), ball: b.x.toFixed(0) + ',' + b.y.toFixed(0) };
 }

@@ -7,7 +7,7 @@
   var TOWER_PAD_PX = 18;      // screen margin around the whole tower
 
   function create(opts) {
-    var levels = opts.levels, progress = opts.progress;
+    var tower = opts.tower, levels = tower.floors, progress = opts.progress;
     var W = levels[0].world.width, H = levels[0].world.height;
     var games = [];
     var cam = { x: W / 2, y: H / 2, s: 1 };
@@ -19,11 +19,11 @@
     // Rebuilds the still pictures of all floors from the saved progress
     function build() {
       games = levels.map(function (level, i) {
-        var open = progress.unlocked(levels, i);
+        var open = progress.unlocked(tower, i);
         return {
           open: open,
           stars: progress.stars(level.id),
-          game: ChainWorld.buildWorld(Matter, level, open ? progress.placements(level.id) : {})
+          game: ChainWorld.buildWorld(Matter, level, open ? progress.placements(level.id) : {}, { edit: true })
         };
       });
     }
@@ -98,7 +98,7 @@
     function drawPipe(ctx, i) {
       var level = levels[i], next = levels[i + 1];
       var basket = level.parts.filter(function (p) { return p.type === 'basket'; })[0];
-      var ball = next.parts.filter(function (p) { return p.type === 'ball'; })[0];
+      var ball = next.parts.filter(function (p) { return p.id === 'ball'; })[0];
       var x0 = basket.x, x1 = ball.x, y0 = top(i) + H, y1 = top(i + 1), mid = (y0 + y1) / 2 + 30;
       ctx.strokeStyle = games[i + 1].open ? ChainRender.COLORS.pipe : ChainRender.COLORS.silhouette;
       ctx.lineWidth = ChainRender.PIPE_W;
@@ -146,7 +146,7 @@
         ctx.restore();
 
         // One line above each floor: number and name, then stars, "you are here", or locked
-        var name = levels[i].name.replace(/^קומה \d+: /, '');
+        var name = levels[i].name.replace(/^[^:]+: /, '');
         var ly = y - 16 / cam.s;   // a fixed distance above the floor on screen, at any zoom
         var here = i === currentIndex && !f.stars;
         if (!f.open) {
