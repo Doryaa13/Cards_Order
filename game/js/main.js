@@ -7,6 +7,7 @@
   var btnPlay = document.getElementById('btn-play');
   var btnReset = document.getElementById('btn-reset');
   var statusEl = document.getElementById('status');
+  var winEl = document.getElementById('win');
   document.getElementById('level-name').textContent = level.name;
 
   var COLORS = {
@@ -21,7 +22,18 @@
     running = false;
     accumulator = 0;
     btnPlay.disabled = false;
+    winEl.hidden = true;
     statusEl.textContent = 'לחצו "הפעל" כדי להפיל את הדומינו הראשון';
+  }
+
+  function finish(outcome) {
+    running = false;
+    if (outcome === 'win') {
+      winEl.hidden = false;
+      statusEl.textContent = 'הכדור בסל!';
+    } else {
+      statusEl.textContent = 'הכדור לא הגיע לסל. לחצו "אפס" ונסו שוב';
+    }
   }
 
   function play() {
@@ -99,9 +111,11 @@
     lastTime = now;
     if (running) {
       accumulator += dt;
-      while (accumulator >= ChainWorld.STEP_MS) {
+      while (running && accumulator >= ChainWorld.STEP_MS) {
         Matter.Engine.update(game.engine, ChainWorld.STEP_MS);
         accumulator -= ChainWorld.STEP_MS;
+        var outcome = ChainWorld.checkOutcome(game);
+        if (outcome) finish(outcome);
       }
     }
     draw();
@@ -110,6 +124,7 @@
 
   btnPlay.addEventListener('click', play);
   btnReset.addEventListener('click', reset);
+  document.getElementById('btn-again').addEventListener('click', reset);
   window.addEventListener('resize', resize);
 
   reset();

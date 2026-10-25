@@ -66,7 +66,35 @@
     return p.x > g.x0 && p.x < g.x1 && p.y > g.y0 && p.y < g.y1;
   }
 
-  var api = { buildWorld: buildWorld, startChain: startChain, ballInGoal: ballInGoal, STEP_MS: 1000 / 60 };
+  // Called once per physics step after the chain starts. Returns 'win', 'fail' or null (still running).
+  // Win: the ball stays inside the basket for half a second.
+  // Fail: the ball has left its start and then stays put outside the basket for two seconds,
+  // or the run passes 40 seconds (for example when the chain breaks before reaching the ball).
+  function checkOutcome(game) {
+    var ball = game.byId.ball, p = ball.position;
+    game.steps = (game.steps || 0) + 1;
+    if (!game.ballStart) game.ballStart = { x: p.x, y: p.y };
+    if (ballInGoal(game)) {
+      game.inGoalSteps = (game.inGoalSteps || 0) + 1;
+      return game.inGoalSteps >= 30 ? 'win' : null;
+    }
+    game.inGoalSteps = 0;
+    // Compare positions once per second; speed alone misreads a ball rocking in place
+    if (game.steps % 60 === 0) {
+      var last = game.ballLast || game.ballStart;
+      var started = Math.abs(p.x - game.ballStart.x) + Math.abs(p.y - game.ballStart.y) > 20;
+      var moved = Math.abs(p.x - last.x) + Math.abs(p.y - last.y) > 3;
+      game.ballLast = { x: p.x, y: p.y };
+      game.stillSeconds = started && !moved ? (game.stillSeconds || 0) + 1 : 0;
+    }
+    if (game.stillSeconds >= 2 || game.steps >= 60 * 40) return 'fail';
+    return null;
+  }
+
+  var api = {
+    buildWorld: buildWorld, startChain: startChain, ballInGoal: ballInGoal,
+    checkOutcome: checkOutcome, STEP_MS: 1000 / 60
+  };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.ChainWorld = api;
 })(this);
