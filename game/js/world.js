@@ -3,7 +3,19 @@
   var DOMINO_W = 12, DOMINO_H = 64, WALL_T = 10;
   var deg = Math.PI / 180;
 
-  // placements: optional { partId: { x, y, angle } } chosen by the player for movable parts.
+  var TOUCH_MIN_SPEED = 0.2;   // a resting piece leaning on a tray part does not count as touching it
+
+  // A part from the tray, placed on the board by the player
+  function makeTrayBody(Matter, item, x, y, angleDeg) {
+    var body = Matter.Bodies.rectangle(x, y, item.w, item.h, {
+      isStatic: true, angle: (angleDeg || 0) * deg, friction: 0.6
+    });
+    body.render.kind = item.type;
+    body.plugin.part = Object.assign({ tray: true }, item);
+    return body;
+  }
+
+  // placements: { trayItemId: { x, y, angle } } for the tray parts the player put on the board.
   function buildWorld(Matter, level, placements) {
     var Bodies = Matter.Bodies, Composite = Matter.Composite;
     var engine = Matter.Engine.create({ positionIterations: 12, velocityIterations: 10 });
@@ -21,8 +33,7 @@
     }
 
     level.parts.forEach(function (part) {
-      var p = part.movable && placements && placements[part.id]
-        ? Object.assign({}, part, placements[part.id]) : part;
+      var p = part;
       var angle = (p.angle || 0) * deg;
       if (p.type === 'wall') {
         add(Bodies.rectangle(p.x, p.y, p.w, p.h, { isStatic: true, angle: angle, friction: 0.6 }), part);
@@ -54,12 +65,42 @@
       Bodies.rectangle(W + 25, H / 2, 50, H * 2, bounds)
     ].forEach(function (b) { b.render.kind = 'bound'; Composite.add(engine.world, b); });
 
-    return { engine: engine, byId: byId, goal: goal, level: level, width: W, height: H };
+    (level.tray || []).forEach(function (item) {
+      var at = placements && placements[item.id];
+      if (at) Composite.add(engine.world, makeTrayBody(Matter, item, at.x, at.y, at.angle));
+    });
+
+    var game = { engine: engine, byId: byId, goal: goal, level: level, width: W, height: H, touched: {} };
+
+    // A tray part lights up when the ball or any other moving piece hits it during the run
+    Matter.Events.on(engine, 'collisionStart', function (e) {
+      if (!game.started) return;
+      e.pairs.forEach(function (pair) {
+        [[pair.bodyA, pair.bodyB], [pair.bodyB, pair.bodyA]].forEach(function (ab) {
+          var part = ab[0].plugin.part, other = ab[1];
+          if (part && part.tray && !other.isStatic && other.speed > TOUCH_MIN_SPEED) game.touched[part.id] = true;
+        });
+      });
+    });
+
+    return game;
+  }
+
+  // Stars for a run where the ball reached the basket. 0 means too few tray parts were touched.
+  // 1 star: at least half the tray parts, 2 stars: at least three quarters, 3 stars: all of them.
+  function score(game) {
+    var total = (game.level.tray || []).length;
+    var touched = Object.keys(game.touched).length;
+    var stars = 3;
+    if (touched < total) stars = touched >= Math.ceil(total * 0.75) ? 2 : 1;
+    if (touched < Math.ceil(total / 2)) stars = 0;
+    return { touched: touched, total: total, needed: Math.ceil(total / 2), stars: stars };
   }
 
   function startChain(Matter, game) {
     var push = game.level.push;
     var target = game.byId[push.target];
+    game.started = true;
     if (target) Matter.Body.setAngularVelocity(target, push.angularVelocity);
   }
 
@@ -104,8 +145,8 @@
   }
 
   var api = {
-    buildWorld: buildWorld, startChain: startChain, ballInGoal: ballInGoal,
-    checkOutcome: checkOutcome, STEP_MS: 1000 / 60
+    buildWorld: buildWorld, makeTrayBody: makeTrayBody, startChain: startChain, ballInGoal: ballInGoal,
+    checkOutcome: checkOutcome, score: score, STEP_MS: 1000 / 60
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.ChainWorld = api;

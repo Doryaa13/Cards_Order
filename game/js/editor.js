@@ -1,5 +1,6 @@
-// Edit mode: drag movable parts to move them, drag the round handle to rotate.
-// Works with mouse and touch through pointer events. Parts may not overlap others or leave the board.
+// Edit mode: drag parts from the tray onto the board, move them, rotate them with the round handle,
+// or drag them back to the tray. Works with mouse and touch through pointer events.
+// Parts may not overlap others or leave the board.
 (function (root) {
   var deg = Math.PI / 180;
   var ROTATE_SNAP = 5 * deg;
@@ -7,16 +8,22 @@
   var HANDLE_GAP = 34;         // distance from the end of the part to the rotation handle (world units)
   var HANDLE_R = 16;           // drawn radius of the rotation handle (world units)
   var ALLOWED_DEPTH = 1.5;     // touching is fine, real overlap is not
+  var TOUCH_LIFT_PX = 56;      // a part pulled from the tray by finger floats above it so it stays visible
 
   function create(opts) {
     var canvas = opts.canvas;
     var game = null, enabled = false;
-    var selected = null, drag = null, invalid = false;
+    var selected = null, drag = null, invalid = false, overTray = false;
 
     function movableBodies() {
       return Matter.Composite.allBodies(game.engine.world).filter(function (b) {
-        return b.plugin.part && b.plugin.part.movable;
+        return b.plugin.part && b.plugin.part.tray;
       });
+    }
+
+    function removeBody(body) {
+      Matter.Composite.remove(game.engine.world, body);
+      if (selected === body) selected = null;
     }
 
     function toWorld(e) {
@@ -89,14 +96,28 @@
       }
       if (drag) {
         drag.lastValid = { x: drag.body.position.x, y: drag.body.position.y, angle: drag.body.angle };
-        canvas.setPointerCapture(e.pointerId);
         e.preventDefault();
       }
       opts.onChange();
     }
 
+    // Start dragging a new copy of a tray item from the tray button the pointer went down on
+    function beginFromTray(item, e) {
+      if (!enabled || !game) return;
+      var p = toWorld(e);
+      var lift = e.pointerType === 'mouse' ? 0 : TOUCH_LIFT_PX / opts.getScale();
+      var body = ChainWorld.makeTrayBody(Matter, item, p.x, p.y - lift, 0);
+      Matter.Composite.add(game.engine.world, body);
+      selected = body;
+      drag = { body: body, mode: 'move', dx: 0, dy: -lift, fromTray: true, lastValid: null };
+      apply(body, body.position, 0);
+      e.preventDefault();
+      opts.onChange();
+    }
+
     function onMove(e) {
       if (!drag) return;
+      overTray = opts.isOverTray(e);
       var p = toWorld(e), body = drag.body;
       if (drag.mode === 'move') {
         apply(body, { x: p.x + drag.dx, y: p.y + drag.dy }, body.angle);
@@ -107,26 +128,33 @@
       opts.onChange();
     }
 
-    function onUp() {
+    // Dropped on the tray: the part goes back. Dropped where it does not fit: back to its last free
+    // spot, or to the tray if it never had one.
+    function onUp(e) {
       if (!drag) return;
-      if (invalid) {
-        var v = drag.lastValid;
+      var v = drag.lastValid;
+      if (opts.isOverTray(e) || (invalid && !v)) {
+        removeBody(drag.body);
+      } else if (invalid) {
         Matter.Body.setPosition(drag.body, { x: v.x, y: v.y });
         Matter.Body.setAngle(drag.body, v.angle);
-        invalid = false;
       }
+      invalid = false;
+      overTray = false;
       drag = null;
       opts.onChange();
     }
 
     canvas.addEventListener('pointerdown', onDown);
-    canvas.addEventListener('pointermove', onMove);
-    canvas.addEventListener('pointerup', onUp);
-    canvas.addEventListener('pointercancel', onUp);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
 
     return {
       // Start with the first movable part selected so its rotate handle is visible right away
-      setGame: function (g) { game = g; drag = null; invalid = false; selected = movableBodies()[0] || null; },
+      setGame: function (g) { game = g; drag = null; invalid = false; overTray = false; selected = null; },
+      beginFromTray: beginFromTray,
+      isDraggingOverTray: function () { return !!drag && overTray; },
       setEnabled: function (on) { enabled = on; if (!on) { selected = null; drag = null; invalid = false; } },
 
       // The player's current placements, in the level's units (degrees)
@@ -143,7 +171,7 @@
       },
 
       isSelected: function (b) { return b === selected; },
-      isInvalid: function (b) { return b === selected && invalid; },
+      isInvalid: function (b) { return b === selected && (invalid || (!!drag && overTray)); },
 
       drawOverlay: function (ctx, colors) {
         if (!enabled || !selected) return;

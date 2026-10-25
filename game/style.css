@@ -1,5 +1,7 @@
 :root {
   --win: #3c9a5f;
+  --part: #7a4fc4;
+  --star: #e0a52f;
   --bg: #f4efe6;
   --ink: #2b2a28;
   --panel: #fffaf2;
@@ -113,3 +115,33 @@ body {
 .win-card .btn { min-width: 180px; margin-top: 6px; }
 @keyframes pop { from { transform: scale(0.8); opacity: 0.4; } to { transform: scale(1); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .win-card { animation: none; } }
+.tray {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  min-height: 60px;
+  padding: 6px;
+  margin-bottom: 6px;
+  border-radius: 12px;
+  border: 1px dashed var(--border);
+  background: var(--panel);
+}
+.tray.drop { border-color: var(--part); border-style: solid; }
+.tray.locked { opacity: 0.5; pointer-events: none; }
+.tray-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 52px;
+  min-height: 46px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  cursor: grab;
+  touch-action: none;
+}
+.tray-bar { display: block; height: 8px; border-radius: 2px; background: var(--part); }
+.tray-empty { color: var(--muted); font-size: 0.9rem; }
+.win-stars { font-size: 2.2rem; letter-spacing: 4px; color: var(--star); line-height: 1; }

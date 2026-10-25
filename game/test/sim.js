@@ -1,5 +1,6 @@
 // Headless check: run each level without a browser.
-// A level must fail as first laid out (otherwise there is no puzzle) and win with its `solution` placements.
+// A level must fail with nothing placed from the tray (otherwise there is no puzzle),
+// and each stored solution must win with the stars it lists.
 // Usage: node game/test/sim.js
 var path = require('path');
 var Matter = require(path.join(__dirname, '../vendor/matter.min.js'));
@@ -18,15 +19,16 @@ function run(level, placements) {
     outcome = ChainWorld.checkOutcome(Matter, game);
   }
   var b = game.byId.ball.position;
-  return { outcome: outcome, seconds: (t / 60).toFixed(2), ball: b.x.toFixed(0) + ',' + b.y.toFixed(0) };
+  var stars = outcome === 'win' ? ChainWorld.score(game).stars : 0;
+  return { outcome: stars ? stars + ' stars' : 'fail', seconds: (t / 60).toFixed(2), ball: b.x.toFixed(0) + ',' + b.y.toFixed(0) };
 }
 
 var failed = 0;
 levels.forEach(function (level) {
-  var checks = [
-    { label: 'as laid out', placements: {}, expect: 'fail' },
-    { label: 'solution', placements: level.solution || {}, expect: 'win' }
-  ];
+  var checks = [{ label: 'nothing placed', placements: {}, expect: 'fail' }].concat(
+    (level.solutions || []).map(function (s, i) {
+      return { label: 'solution ' + (i + 1), placements: s.placements, expect: s.stars + ' stars' };
+    }));
   checks.forEach(function (c) {
     var r = run(level, c.placements);
     var ok = r.outcome === c.expect;

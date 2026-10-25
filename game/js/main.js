@@ -10,22 +10,67 @@
   var winEl = document.getElementById('win');
   document.getElementById('level-name').textContent = level.name;
 
+  var trayEl = document.getElementById('tray');
+  var trayItems = level.tray || [];
+
   var COLORS = {
     sky: '#fbf7f0', wall: '#6b5b4b', domino: ['#2f6fb0', '#e0662f', '#3c9a5f', '#c9a227'],
     ball: '#d63c3c', basket: '#8a5a2b', goal: 'rgba(60,154,95,0.18)',
-    movable: '#7a4fc4', handle: '#7a4fc4', invalid: '#d63c3c', selected: '#fff'
+    movable: '#7a4fc4', handle: '#7a4fc4', invalid: '#d63c3c', selected: '#fff', touched: '#1fa36f'
   };
-  var EDIT_HINT = 'גררו את החלק הסגול. העיגול מסובב אותו';
 
-  // mode: 'edit' (player arranges movable parts), 'run' (physics running), 'done' (result shown)
+  // mode: 'edit' (player arranges tray parts), 'run' (physics running), 'done' (result shown)
   var game, mode, accumulator, lastTime, scale;
   var placements = {};   // the player's arrangement, kept across runs
+  var lastTouched = -1;
 
   var editor = ChainEditor.create({
     canvas: canvas,
     getScale: function () { return scale; },
-    onChange: function () {}
+    isOverTray: function (e) { return e.clientY > canvas.getBoundingClientRect().bottom; },
+    onChange: function () { if (mode === 'edit') updateEditUi(); }
   });
+
+  function starText(n) { return '★★★'.slice(0, n) + '☆☆☆'.slice(0, 3 - n); }
+
+  // Tray buttons for the parts not yet on the board, each drawn to scale against the others
+  var trayKey = null;
+  function renderTray() {
+    var onBoard = editor.placements();
+    var key = Object.keys(onBoard).sort().join(',');
+    if (key === trayKey) return;
+    trayKey = key;
+    var longest = Math.max.apply(null, trayItems.map(function (it) { return it.w; }));
+    trayEl.innerHTML = '';
+    trayItems.forEach(function (item) {
+      if (onBoard[item.id]) return;
+      var btn = document.createElement('button');
+      btn.className = 'tray-item';
+      btn.setAttribute('aria-label', 'רמפה באורך ' + item.w);
+      var bar = document.createElement('span');
+      bar.className = 'tray-bar';
+      bar.style.width = Math.round(28 + 62 * item.w / longest) + 'px';
+      btn.appendChild(bar);
+      btn.addEventListener('pointerdown', function (e) { editor.beginFromTray(item, e); });
+      trayEl.appendChild(btn);
+    });
+    if (!trayEl.children.length) {
+      var done = document.createElement('p');
+      done.className = 'tray-empty';
+      done.textContent = 'כל החלקים על הלוח';
+      trayEl.appendChild(done);
+    }
+  }
+
+  function updateEditUi() {
+    var left = trayItems.length - Object.keys(editor.placements()).length;
+    renderTray();
+    trayEl.classList.toggle('drop', editor.isDraggingOverTray());
+    btnPlay.disabled = left > 0;
+    statusEl.textContent = left > 0
+      ? 'גררו את החלקים מהמאגר ללוח (נשארו ' + left + ')'
+      : 'אפשר לסובב עם העיגול. מוכנים? לחצו "הפעל"';
+  }
 
   // Back to edit mode with the player's arrangement
   function edit() {
@@ -34,14 +79,15 @@
     editor.setEnabled(true);
     mode = 'edit';
     accumulator = 0;
-    btnPlay.disabled = false;
     btnReset.textContent = '↺ אפס';
     winEl.hidden = true;
-    statusEl.textContent = EDIT_HINT;
+    trayEl.classList.remove('locked');
+    trayKey = null;
+    updateEditUi();
   }
 
   function onResetClick() {
-    // While editing, the button puts movable parts back where the level started them
+    // While editing, the button sends every part back to the tray
     if (mode === 'edit') placements = {};
     edit();
   }
@@ -54,23 +100,40 @@
   function finish(outcome) {
     mode = 'done';
     btnReset.textContent = '✎ חזרה לעריכה';
-    if (outcome === 'win') {
+    var s = ChainWorld.score(game);
+    if (outcome === 'win' && s.stars > 0) {
+      document.getElementById('win-stars').textContent = starText(s.stars);
+      document.getElementById('win-text').textContent =
+        'הכדור נגע ב-' + s.touched + ' מתוך ' + s.total + ' חלקים' +
+        (s.stars < 3 ? '. נסו לגעת בכולם בשביל 3 כוכבים' : '. מושלם!');
       winEl.hidden = false;
       statusEl.textContent = 'הכדור בסל!';
+    } else if (outcome === 'win') {
+      statusEl.textContent = 'הכדור בסל, אבל נגע רק ב-' + s.touched + ' מתוך ' + s.total +
+        ' חלקים. צריך לפחות ' + s.needed;
     } else {
       statusEl.textContent = 'הכדור לא הגיע לסל. חזרו לעריכה ונסו מיקום אחר';
     }
   }
 
   function play() {
-    if (mode !== 'edit') return;
+    if (mode !== 'edit' || btnPlay.disabled) return;
     placements = editor.placements();
     editor.setEnabled(false);
     mode = 'run';
+    lastTouched = -1;
     btnPlay.disabled = true;
     btnReset.textContent = '■ עצור';
+    trayEl.classList.add('locked');
     ChainWorld.startChain(Matter, game);
-    statusEl.textContent = 'השרשרת רצה...';
+  }
+
+  // During a run the status line counts the touched parts
+  function updateRunUi() {
+    var s = ChainWorld.score(game);
+    if (s.touched === lastTouched) return;
+    lastTouched = s.touched;
+    statusEl.textContent = 'חלקים שנגעו: ' + s.touched + ' מתוך ' + s.total;
   }
 
   // Fit the canvas to the stage while keeping the world's aspect ratio
@@ -100,10 +163,19 @@
     ctx.fill();
   }
 
-  // Movable parts are purple with grip dots; the selected one gets an outline
+  // Tray parts are purple with grip dots, and turn green once something hits them during a run
   function drawMovable(body) {
     var bad = editor.isInvalid(body);
-    drawBody(body, bad ? COLORS.invalid : COLORS.movable);
+    var hit = game.touched[body.plugin.part.id];
+    if (hit) {
+      ctx.save();
+      ctx.shadowColor = COLORS.touched;
+      ctx.shadowBlur = 14;
+      drawBody(body, COLORS.touched);
+      ctx.restore();
+    } else {
+      drawBody(body, bad ? COLORS.invalid : COLORS.movable);
+    }
     if (editor.isSelected(body)) {
       tracePath(body);
       ctx.strokeStyle = COLORS.selected;
@@ -134,7 +206,7 @@
     Matter.Composite.allBodies(game.engine.world).forEach(function (b) {
       var kind = b.render.kind;
       if (kind === 'bound') return;
-      if (b.plugin.part && b.plugin.part.movable) {
+      if (b.plugin.part && b.plugin.part.tray) {
         drawMovable(b);
       } else if (kind === 'ball') {
         ctx.beginPath();
@@ -173,6 +245,7 @@
         var outcome = ChainWorld.checkOutcome(Matter, game);
         if (outcome) finish(outcome);
       }
+      if (mode === 'run') updateRunUi();
     }
     draw();
     requestAnimationFrame(frame);
