@@ -1,6 +1,6 @@
 {
   "id": "floor3",
-  "name": "קומה 3: החומה",
+  "name": "קומה 6: החומה",
   "notes": "The ball drops in from the pipe on the left. A tall fixed wall splits the bottom of the floor, with the basket on the far side. Ramps can carry the ball over the wall for one star; three stars also needs the spring.",
   "world": {"width": 600, "height": 1000},
   "launch": {"vx": 1.5, "vy": 0},

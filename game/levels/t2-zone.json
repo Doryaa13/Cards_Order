@@ -1,0 +1,22 @@
+{
+  "id": "t2-zone",
+  "name": "קומה 4: אזור אסור",
+  "notes": "Introduces no-build zones: the striped middle of the floor takes no parts. The ball still flies through it, so the ramps go above and below it.",
+  "world": {"width": 600, "height": 1000},
+  "launch": {"vx": 0, "vy": 0},
+  "noBuild": [
+    {"x": 300, "y": 520, "w": 440, "h": 380}
+  ],
+  "tray": [
+    {"id": "a", "type": "wall", "w": 240, "h": 16},
+    {"id": "b", "type": "wall", "w": 240, "h": 16},
+    {"id": "c", "type": "wall", "w": 240, "h": 16}
+  ],
+  "solutions": [
+    {"stars": 3, "placements": {"a": {"x": 420, "y": 200, "angle": 160}, "b": {"x": 130, "y": 760, "angle": 20}, "c": {"x": 300, "y": 860, "angle": 170}}}
+  ],
+  "parts": [
+    {"type": "ball", "id": "ball", "x": 480, "y": 40, "r": 16},
+    {"type": "basket", "x": 110, "y": 990, "w": 220, "h": 90}
+  ]
+}

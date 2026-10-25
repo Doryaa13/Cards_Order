@@ -1,6 +1,6 @@
 {
   "id": "floor2",
-  "name": "קומה 2: מסביב לבלוק",
+  "name": "קומה 3: מסביב לבלוק",
   "notes": "The ball drops in from the pipe on the right. A fixed block fills the middle of the floor and the basket sits at the bottom left, under it. With nothing placed the ball falls straight down the right side and misses.",
   "world": {"width": 600, "height": 1000},
   "launch": {"vx": -1.5, "vy": 0},

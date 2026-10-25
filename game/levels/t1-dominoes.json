@@ -1,0 +1,20 @@
+{
+  "id": "t1-dominoes",
+  "name": "קומה 7: שורת דומינו",
+  "notes": "Teaches the domino row and the helper ball: the grey ball drops from the pipe; stand the row so it lands on the first domino, and the last domino tips the red ball off the shelf into the basket.",
+  "world": {"width": 600, "height": 1000},
+  "launch": {"vx": 0, "vy": 0},
+  "goalBall": "goal",
+  "tray": [
+    {"id": "d", "type": "dominoes", "count": 7}
+  ],
+  "solutions": [
+    {"stars": 3, "placements": {"d": {"x": 290, "y": 560, "angle": 0}}}
+  ],
+  "parts": [
+    {"type": "ball", "id": "ball", "x": 200, "y": 40, "r": 16},
+    {"type": "wall", "x": 244, "y": 600, "w": 488, "h": 16},
+    {"type": "ball", "id": "goal", "x": 482, "y": 576, "r": 16},
+    {"type": "basket", "x": 510, "y": 990, "w": 180, "h": 90}
+  ]
+}

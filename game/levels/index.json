@@ -2,12 +2,32 @@
   "towers": [
     {
       "id": "tower1",
-      "name": "מגדל 1",
+      "world": "עולם 1: בית המלאכה",
+      "name": "מגדל 1: ההתחלה",
       "floors": [
-        "floor1.json",
+        "t1-ramp.json",
+        "t1-zigzag.json",
         "floor2.json",
+        "t1-spring.json",
+        "floor1.json",
         "floor3.json",
+        "t1-dominoes.json",
         "floor4.json"
+      ]
+    },
+    {
+      "id": "tower2",
+      "world": "עולם 1: בית המלאכה",
+      "name": "מגדל 2: מגרש המשחקים",
+      "floors": [
+        "t2-funnel.json",
+        "t2-funnel-ramp.json",
+        "t2-seesaw.json",
+        "t2-zone.json",
+        "t2-heavy.json",
+        "t2-seesaw-ramp.json",
+        "t2-spring-funnel.json",
+        "t2-boss.json"
       ]
     },
     {

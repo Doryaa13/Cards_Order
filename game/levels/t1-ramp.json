@@ -1,0 +1,17 @@
+{
+  "id": "t1-ramp",
+  "name": "קומה 1: רמפה אחת",
+  "notes": "Teaches dragging: the ball falls on the left, the basket is on the right, and one ramp bridges them.",
+  "world": {"width": 600, "height": 1000},
+  "launch": {"vx": 0, "vy": 0},
+  "tray": [
+    {"id": "a", "type": "wall", "w": 340, "h": 16}
+  ],
+  "solutions": [
+    {"stars": 3, "placements": {"a": {"x": 230, "y": 500, "angle": 15}}}
+  ],
+  "parts": [
+    {"type": "ball", "id": "ball", "x": 120, "y": 40, "r": 16},
+    {"type": "basket", "x": 480, "y": 990, "w": 200, "h": 90}
+  ]
+}

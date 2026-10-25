@@ -1,0 +1,19 @@
+{
+  "id": "t1-zigzag",
+  "name": "קומה 2: זיגזג",
+  "notes": "Teaches rotating: a fixed shelf covers the basket corner, so one ramp takes the ball left and a second, tilted the other way, brings it back under the shelf.",
+  "world": {"width": 600, "height": 1000},
+  "launch": {"vx": 0, "vy": 0},
+  "tray": [
+    {"id": "a", "type": "wall", "w": 260, "h": 16},
+    {"id": "b", "type": "wall", "w": 340, "h": 16}
+  ],
+  "solutions": [
+    {"stars": 3, "placements": {"a": {"x": 390, "y": 300, "angle": 160}, "b": {"x": 200, "y": 700, "angle": 20}}}
+  ],
+  "parts": [
+    {"type": "ball", "id": "ball", "x": 480, "y": 40, "r": 16},
+    {"type": "wall", "x": 500, "y": 620, "w": 200, "h": 16},
+    {"type": "basket", "x": 470, "y": 990, "w": 260, "h": 90}
+  ]
+}

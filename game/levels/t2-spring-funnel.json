@@ -1,0 +1,19 @@
+{
+  "id": "t2-spring-funnel",
+  "name": "קומה 7: קפיץ ומשפך",
+  "notes": "The spring throws the ball over the ramp as before, but the cup on the right is narrow. A funnel in the throw's path, above the cup, catches it.",
+  "world": {"width": 600, "height": 1000},
+  "launch": {"vx": 0, "vy": 0},
+  "tray": [
+    {"id": "s", "type": "spring"},
+    {"id": "f", "type": "funnel"}
+  ],
+  "solutions": [
+    {"stars": 3, "tap": {"part": "s", "step": 150}, "placements": {"s": {"x": 50, "y": 742, "angle": 45}, "f": {"x": 470, "y": 700, "angle": 0}}}
+  ],
+  "parts": [
+    {"type": "ball", "id": "ball", "x": 250, "y": 40, "r": 16},
+    {"type": "wall", "x": 206, "y": 715, "w": 240, "h": 16, "angle": 160},
+    {"type": "basket", "x": 470, "y": 990, "w": 90, "h": 80}
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "id": "t2-seesaw-ramp",
+  "name": "קומה 6: נדנדה ורמפה",
+  "notes": "The heavy ball now enters on the far left. A ramp has to carry it over to the seesaw's high end so it can fling the red ball into the basket.",
+  "world": {"width": 600, "height": 1000},
+  "launch": {"vx": 0, "vy": 0},
+  "goalBall": "goal",
+  "tray": [
+    {"id": "s", "type": "seesaw"},
+    {"id": "a", "type": "wall", "w": 300, "h": 16}
+  ],
+  "solutions": [
+    {"stars": 3, "placements": {"a": {"x": 160, "y": 300, "angle": 15}, "s": {"x": 335, "y": 750, "angle": 0}}}
+  ],
+  "parts": [
+    {"type": "ball", "id": "ball", "x": 90, "y": 40, "r": 18, "heavy": true},
+    {"type": "ball", "id": "goal", "x": 262, "y": 560, "r": 16},
+    {"type": "basket", "x": 480, "y": 990, "w": 240, "h": 90}
+  ]
+}

@@ -1,6 +1,6 @@
 {
   "id": "floor4",
-  "name": "קומה 4: מבוך המדפים",
+  "name": "קומה 8: מבוך המדפים",
   "notes": "The ball drops in on the right. Three fixed shelves stagger down the floor, each tipping the ball back to the right wall. Four ramps in the tray, so two stars are possible here: three stars means zigzagging the ball across all four.",
   "world": {"width": 600, "height": 1000},
   "launch": {"vx": -1, "vy": 0},

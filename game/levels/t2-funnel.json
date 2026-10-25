@@ -1,0 +1,18 @@
+{
+  "id": "t2-funnel",
+  "name": "קומה 1: משפך",
+  "notes": "Introduces the funnel: the ball is shot across the floor and flies over the narrow cup. A funnel in its path, right above the cup, catches it and drops it in.",
+  "world": {"width": 600, "height": 1000},
+  "launch": {"vx": 4, "vy": 0},
+  "tray": [
+    {"id": "f", "type": "funnel"}
+  ],
+  "solutions": [
+    {"stars": 3, "placements": {"f": {"x": 200, "y": 280, "angle": 0}}}
+  ],
+  "parts": [
+    {"type": "ball", "id": "ball", "x": 90, "y": 40, "r": 16},
+    {"type": "wall", "x": 300, "y": 745, "w": 600, "h": 16},
+    {"type": "basket", "x": 200, "y": 737, "w": 100, "h": 80}
+  ]
+}

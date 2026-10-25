@@ -14,6 +14,8 @@
   var statusEl = document.getElementById('status');
   var winEl = document.getElementById('win');
   var trayEl = document.getElementById('tray');
+  var winTitleEl = document.getElementById('win-title');
+  var towersEl = document.getElementById('towers');
 
   // Tray button pictures for parts that are not plain ramps
   var ICONS = {
@@ -32,8 +34,11 @@
   };
 
   var towers, towerIndex = 0, towerData, levels, progress, tower;
-  // view: 'tower' or 'floor'. mode (inside a floor): 'edit', 'run' or 'done'.
+  // view: 'tower', 'floor' or 'replay' (the finished tower running from top to bottom).
+  // mode (inside a floor): 'edit', 'run' or 'done'.
   var view = null, mode = null;
+  var runTaps = [];      // taps during the current run: [{ part, step }], saved with a win
+  var replay = null;     // { index, game, taps, running } while the tower replays
   var floorIndex = 0, level = null, trayItems = [];
   var game, accumulator = 0, lastTime = null, scale = 1;
   var placements = {};   // the player's arrangement on this floor, kept across runs
@@ -56,7 +61,7 @@
 
   function resize() {
     var sz = stageSize();
-    if (view === 'tower') {
+    if (view === 'tower' || view === 'replay') {
       canvas.style.width = sz.w + 'px';
       canvas.style.height = sz.h + 'px';
       canvas.width = Math.floor(sz.w * sz.dpr);
@@ -95,10 +100,12 @@
     titleEl.textContent = towerData.name + ' · ★ ' + totalStars() + ' מתוך ' + levels.length * 3;
     btnTower.hidden = true;
     btnSwitch.hidden = towers.length < 2;
-    btnSwitch.textContent = towers[(towerIndex + 1) % towers.length].name;
+    btnSwitch.textContent = 'מגדלים';
     btnReset.hidden = true;
     btnPlay.disabled = false;
-    btnPlay.textContent = '▶ לקומה ' + (progress.currentIndex(towerData) + 1);
+    btnPlay.textContent = progress.complete(towerData) && !towerData.open
+      ? '★ סיימתי את המגדל!'
+      : '▶ לקומה ' + (progress.currentIndex(towerData) + 1);
     trayEl.classList.remove('locked', 'drop');
     trayEl.innerHTML = '<p class="tray-empty">' + trayText + '</p>';
     statusEl.textContent = ' ';
@@ -256,27 +263,35 @@
     mode = 'done';
     btnReset.textContent = '✎ חזרה לעריכה';
     var s = ChainWorld.score(game);
+    var many = game.goalBalls.length > 1;
     if (outcome === 'win' && s.stars > 0) {
-      progress.saveWin(level.id, s.stars, placements);
+      progress.saveWin(level.id, s.stars, placements, runTaps);
       var last = floorIndex === levels.length - 1;
+      winTitleEl.textContent = 'הצלחת!';
       document.getElementById('win-stars').textContent = starText(s.stars);
       document.getElementById('win-text').textContent =
         'הכדור נגע ב-' + s.touched + ' מתוך ' + s.total + ' חלקים' +
         (s.stars < 3 ? '. נסו לגעת בכולם בשביל 3 כוכבים' : '. מושלם!');
-      btnNext.textContent = last ? '↑ למגדל' : '▼ לקומה ' + (floorIndex + 2);
+      // Once every floor of a tower has a star, the next step is watching the whole tower run
+      var done = progress.complete(towerData) && !towerData.open;
+      btnNext.textContent = done ? '★ סיימתי את המגדל!' : last ? '↑ למגדל' : '▼ לקומה ' + (floorIndex + 2);
       winEl.hidden = false;
-      statusEl.textContent = 'הכדור בסל!';
+      statusEl.textContent = many ? 'כל הכדורים בסלים שלהם!' : 'הכדור בסל!';
     } else if (outcome === 'win') {
-      statusEl.textContent = 'הכדור בסל, אבל נגע רק ב-' + s.touched + ' מתוך ' + s.total +
+      statusEl.textContent = (many ? 'הכדורים בסלים' : 'הכדור בסל') + ', אבל נגעו רק ב-' + s.touched + ' מתוך ' + s.total +
         ' חלקים. צריך לפחות ' + s.needed;
     } else {
-      statusEl.textContent = 'הכדור לא הגיע לסל. חזרו לעריכה ונסו מיקום אחר';
+      statusEl.textContent = many
+        ? 'לא כל הכדורים הגיעו לסל בצבע שלהם. חזרו לעריכה ונסו שוב'
+        : 'הכדור לא הגיע לסל. חזרו לעריכה ונסו מיקום אחר';
     }
   }
 
   function play() {
     if (view === 'tower') {
-      if (!tower.skip()) flyToFloor(progress.currentIndex(towerData));
+      if (tower.skip()) return;
+      if (progress.complete(towerData) && !towerData.open) startReplay();
+      else flyToFloor(progress.currentIndex(towerData));
       return;
     }
     if (mode !== 'edit' || btnPlay.disabled) return;
@@ -286,6 +301,7 @@
     // The run gets its own world: seesaws on their pivots, domino rows as separate dominoes
     game = ChainWorld.buildWorld(Matter, level, placements);
     mode = 'run';
+    runTaps = [];
     lastRunText = null;
     btnPlay.disabled = true;
     btnReset.textContent = '■ עצור';
@@ -320,10 +336,132 @@
     springs.forEach(function (b) {
       if (Math.hypot(b.position.x - p.x, b.position.y - p.y) < 50 + 30 / scale) target = b;
     });
-    if (target) {
-      ChainWorld.fireSpring(Matter, game, target);
+    if (target && ChainWorld.fireSpring(Matter, game, target)) {
+      runTaps.push({ part: target.plugin.part.id, step: game.steps || 0 });
       e.preventDefault();
     }
+  }
+
+  // ---- The finished tower, running from top to bottom ----
+
+  // Every floor replays its best run (same arrangement, same taps, same physics), one after the
+  // other, while the camera follows down the tower. Then the tower is marked done.
+  function startReplay() {
+    towerChrome('המכונה שלכם, מההתחלה ועד הסוף');
+    view = 'replay';
+    btnPlay.disabled = true;
+    btnPlay.textContent = '▶ רץ...';
+    btnSwitch.hidden = true;
+    btnReset.hidden = false;
+    btnReset.textContent = '⏭ דלג';
+    replayFloor(0);
+  }
+
+  function replayFloor(i) {
+    if (i >= levels.length) { endReplay(); return; }
+    var run = progress.bestRun(levels[i].id);
+    var g = ChainWorld.buildWorld(Matter, levels[i], run ? run.placements : {});
+    replay = { index: i, game: g, taps: run ? run.taps : [], running: false };
+    statusEl.textContent = levels[i].name;
+    tower.animate([tower.replayCamera(i)], i === 0 ? 1200 : 900, function () {
+      ChainWorld.startChain(Matter, g);
+      replay.running = true;
+      accumulator = 0;
+    });
+  }
+
+  function stepReplay(dt) {
+    if (!replay || !replay.running) return;
+    accumulator += dt;
+    var g = replay.game;
+    while (replay && replay.running && accumulator >= ChainWorld.STEP_MS) {
+      replay.taps.forEach(function (t) {
+        if (t.step !== (g.steps || 0)) return;
+        var spring = Matter.Composite.allBodies(g.engine.world).filter(function (b) {
+          return b.plugin.part && b.plugin.part.id === t.part;
+        })[0];
+        if (spring) ChainWorld.fireSpring(Matter, g, spring);
+      });
+      Matter.Engine.update(g.engine, ChainWorld.STEP_MS);
+      accumulator -= ChainWorld.STEP_MS;
+      if (ChainWorld.checkOutcome(Matter, g)) {
+        replay.running = false;
+        replayFloor(replay.index + 1);
+      }
+    }
+  }
+
+  function endReplay() {
+    replay = null;
+    view = 'tower';
+    btnReset.hidden = true;
+    tower.animate([tower.towerCamera()], 1400, function () {
+      var next = nextTowerIndex();
+      winTitleEl.textContent = 'המגדל הושלם!';
+      document.getElementById('win-stars').textContent = '★ ' + totalStars() + ' מתוך ' + levels.length * 3;
+      document.getElementById('win-text').textContent = next >= 0
+        ? 'המגדל הבא נפתח: ' + towers[next].name
+        : 'סיימתם את כל המגדלים שיש כרגע!';
+      btnNext.textContent = next >= 0 ? '▶ למגדל הבא' : '↺ צפו שוב';
+      btnEdit.textContent = '↑ חזרה למגדל';
+      winEl.hidden = false;
+    });
+  }
+
+  // The next tower in the main progression (not the lab), or -1
+  function nextTowerIndex() {
+    for (var i = towerIndex + 1; i < towers.length; i++) if (!towers[i].open) return i;
+    return -1;
+  }
+
+  // ---- Choosing a tower ----
+
+  function openTowerList() {
+    towersEl.innerHTML = '';
+    var world = null;
+    towers.forEach(function (t, i) {
+      if (t.world && t.world !== world) {
+        world = t.world;
+        var h = document.createElement('p');
+        h.className = 'towers-world';
+        h.textContent = world;
+        towersEl.appendChild(h);
+      }
+      var open = progress.towerUnlocked(towers, i);
+      var stars = t.floors.reduce(function (sum, f) { return sum + progress.stars(f.id); }, 0);
+      var btn = document.createElement('button');
+      btn.className = 'btn tower-choice' + (i === towerIndex ? ' current' : '');
+      btn.disabled = !open;
+      btn.innerHTML = '<span>' + t.name + '</span><span class="tower-stars">' +
+        (open ? '★ ' + stars + '/' + t.floors.length * 3 : 'נעול') + '</span>';
+      btn.addEventListener('click', function () { chooseTower(i); });
+      towersEl.appendChild(btn);
+    });
+    var close = document.createElement('button');
+    close.className = 'btn';
+    close.textContent = 'סגירה';
+    close.addEventListener('click', function () { towersEl.hidden = true; });
+    towersEl.appendChild(close);
+    towersEl.hidden = false;
+  }
+
+  function chooseTower(i) {
+    towersEl.hidden = true;
+    useTower(i);
+    towerChrome('געו בקומה כדי לשחק בה. גררו כדי לגלול');
+    tower.setCamera(tower.towerCamera());
+    tower.animate([tower.menuCamera(progress.currentIndex(towerData))], 900);
+  }
+
+  // Where to start: the first tower of the main progression that is open and not yet complete
+  function startingTower() {
+    var last = 0;
+    for (var i = 0; i < towers.length; i++) {
+      if (towers[i].open || !progress.towerUnlocked(towers, i)) continue;
+      last = i;
+      if (!progress.complete(towers[i])) return i;
+    }
+    return last;
   }
 
   // ---- Main loop. Fixed-step physics keeps the simulation identical on every device. ----
@@ -335,6 +473,12 @@
     if (view === 'tower') {
       tower.update(now);
       if (view === 'tower') tower.draw(ctx, progress.currentIndex(towerData));
+    }
+    if (view === 'replay') {
+      tower.update(now);
+      stepReplay(dt);
+      if (replay) tower.draw(ctx, -1, { index: replay.index, game: replay.game, mode: 'run' });
+      else tower.draw(ctx, -1);
     }
     if (view === 'floor') {
       if (mode === 'run') {
@@ -355,18 +499,33 @@
   }
 
   btnPlay.addEventListener('click', play);
-  btnReset.addEventListener('click', onResetClick);
-  btnTower.addEventListener('click', function () { if (view === 'floor') showTower(false); });
-  btnSwitch.addEventListener('click', function () {
-    if (view !== 'tower') return;
-    useTower((towerIndex + 1) % towers.length);
-    towerChrome('געו בקומה כדי לשחק בה. גררו כדי לגלול');
-    tower.setCamera(tower.towerCamera());
-    tower.animate([tower.menuCamera(progress.currentIndex(towerData))], 900);
+  btnReset.addEventListener('click', function () {
+    if (view === 'replay') { if (replay) { replay.running = false; tower.skip(); } endReplay(); return; }
+    onResetClick();
   });
-  btnNext.addEventListener('click', goToNextFloor);
-  // Back to editing with the arrangement that just won, to improve on it
-  btnEdit.addEventListener('click', edit);
+  btnTower.addEventListener('click', function () { if (view === 'floor') showTower(false); });
+  btnSwitch.addEventListener('click', function () { if (view === 'tower') openTowerList(); });
+  btnNext.addEventListener('click', function () {
+    if (view === 'tower') {
+      // The "tower complete" card: on to the next tower, or watch again
+      var next = nextTowerIndex();
+      btnEdit.textContent = '✎ המשך לערוך';
+      if (next >= 0) { useTower(next); winEl.hidden = true; showTower(true); }
+      else startReplay();
+      return;
+    }
+    if (progress.complete(towerData) && !towerData.open && btnNext.textContent.indexOf('סיימתי') >= 0) {
+      showTower(false);
+      startReplay();
+      return;
+    }
+    goToNextFloor();
+  });
+  btnEdit.addEventListener('click', function () {
+    if (view === 'tower') { winEl.hidden = true; btnEdit.textContent = '✎ המשך לערוך'; return; }
+    // Back to editing with the arrangement that just won, to improve on it
+    edit();
+  });
   canvas.addEventListener('pointerdown', onRunTap);
   canvas.addEventListener('pointerdown', onTowerDown);
   window.addEventListener('pointermove', onTowerMove);
@@ -380,7 +539,7 @@
   ChainLevels.load().then(function (loaded) {
     towers = loaded;
     progress = ChainProgress.create();
-    useTower(0);
+    useTower(startingTower());
     showTower(true);
     requestAnimationFrame(frame);
   }).catch(function (err) {

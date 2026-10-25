@@ -1,0 +1,18 @@
+{
+  "id": "t1-spring",
+  "name": "קומה 4: קפיץ",
+  "notes": "Teaches the tap: the ball rolls down a fixed ramp toward the left wall. Put the spring at the bottom of the ramp, tilted up, so the ball comes to rest in the V between them; then tap and the spring throws it over the ramp to the basket.",
+  "world": {"width": 600, "height": 1000},
+  "launch": {"vx": 0, "vy": 0},
+  "tray": [
+    {"id": "s", "type": "spring"}
+  ],
+  "solutions": [
+    {"stars": 3, "tap": {"part": "s", "step": 150}, "placements": {"s": {"x": 50, "y": 742, "angle": 45}}}
+  ],
+  "parts": [
+    {"type": "ball", "id": "ball", "x": 250, "y": 40, "r": 16},
+    {"type": "wall", "x": 206, "y": 715, "w": 240, "h": 16, "angle": 160},
+    {"type": "basket", "x": 510, "y": 990, "w": 180, "h": 90}
+  ]
+}

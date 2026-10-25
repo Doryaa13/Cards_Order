@@ -177,3 +177,19 @@ body {
 .tray-bar { display: block; height: 8px; border-radius: 2px; background: var(--part); }
 .tray-empty { color: var(--muted); font-size: 0.9rem; }
 .win-stars { font-size: 2.2rem; letter-spacing: 4px; color: var(--star); line-height: 1; }
+.towers {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  overflow-y: auto;
+  background: var(--bg);
+}
+.towers[hidden] { display: none; }
+.towers-world { font-weight: 700; color: var(--muted); margin-top: 6px; }
+.tower-choice { display: flex; justify-content: space-between; align-items: center; }
+.tower-choice.current { border-color: var(--accent); border-width: 2px; }
+.tower-stars { color: var(--star); font-variant-numeric: tabular-nums; }
+.tower-choice:disabled .tower-stars { color: var(--muted); }

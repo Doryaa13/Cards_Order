@@ -1,0 +1,18 @@
+{
+  "id": "t2-funnel-ramp",
+  "name": "קומה 2: משפך ורמפה",
+  "notes": "The ball is shot hard to the right and drops down the right wall. The cup at the bottom is narrow: a ramp brings the ball back toward the middle and the funnel lines it up with the cup.",
+  "world": {"width": 600, "height": 1000},
+  "launch": {"vx": 7, "vy": 0},
+  "tray": [
+    {"id": "f", "type": "funnel"},
+    {"id": "a", "type": "wall", "w": 200, "h": 16}
+  ],
+  "solutions": [
+    {"stars": 3, "placements": {"a": {"x": 500, "y": 600, "angle": 165}, "f": {"x": 300, "y": 830, "angle": 0}}}
+  ],
+  "parts": [
+    {"type": "ball", "id": "ball", "x": 90, "y": 40, "r": 16},
+    {"type": "basket", "x": 300, "y": 990, "w": 70, "h": 70}
+  ]
+}

@@ -9,7 +9,7 @@
   var SPRING_KICK = 22;        // speed added along the spring's facing direction when it fires
   var SPRING_REACH = 40;       // how far above its pad the spring still catches things
 
-  var FUNNEL_W = 170, FUNNEL_H = 90, FUNNEL_GAP = 44, FUNNEL_T = 12;
+  var FUNNEL_W = 170, FUNNEL_H = 90, FUNNEL_GAP = 44, FUNNEL_T = 12, SPOUT = 40;
   var SEESAW_W = 220, SEESAW_H = 14, SEESAW_MAX = 30;   // a seesaw rocks between -30 and +30 degrees
   var ROW_SPACING = 34;
 
@@ -44,9 +44,13 @@
       var len = Math.hypot(item.h, run) + FUNNEL_T, mid = inner + run / 2;
       var left = Bodies.rectangle(-mid, 0, len, FUNNEL_T, { angle: slope });
       var right = Bodies.rectangle(mid, 0, len, FUNNEL_T, { angle: -slope });
+      // A short spout under the opening straightens the ball so it drops out straight down
+      var spoutX = item.gap / 2 + FUNNEL_T / 2, spoutY = item.h / 2 + SPOUT / 2;
+      var spoutL = Bodies.rectangle(-spoutX, spoutY, FUNNEL_T, SPOUT);
+      var spoutR = Bodies.rectangle(spoutX, spoutY, FUNNEL_T, SPOUT);
       // An invisible sensor in the throat, so a ball dropping cleanly through still counts as a touch
-      var throat = Bodies.rectangle(0, item.h / 2 - FUNNEL_T, item.gap, FUNNEL_T, { isSensor: true });
-      var funnel = Body.create({ parts: [left, right, throat], isStatic: true, friction: 0.3 });
+      var throat = Bodies.rectangle(0, item.h / 2, item.gap, FUNNEL_T, { isSensor: true });
+      var funnel = Body.create({ parts: [left, right, spoutL, spoutR, throat], isStatic: true, friction: 0.3 });
       Body.setPosition(funnel, { x: x, y: y });
       Body.setAngle(funnel, angle);
       return [tag(funnel)];
@@ -108,7 +112,15 @@
     engine.gravity.y = 1; engine.gravity.scale = 0.0018;
     var W = level.world.width, H = level.world.height;
     var byId = {};
-    var goal = null;
+    var baskets = [], zones = [];
+
+    // Ball colors: a colored ball has to end up in the basket of its color; balls without a color
+    // are helpers. A floor that names no colors has one red goal ball (goalBall, or 'ball').
+    var anyColor = level.parts.some(function (p) { return p.type === 'ball' && p.color; });
+    function colorOf(p) {
+      if (p.color) return p.color;
+      return !anyColor && p.id === (level.goalBall || 'ball') ? 'red' : null;
+    }
 
     function add(body, part) {
       body.render.kind = part.type;
@@ -129,9 +141,10 @@
         }), part);
       } else if (p.type === 'ball') {
         // A heavy ball weighs four times as much: enough to tip a seesaw and fling a normal ball
-        add(Bodies.circle(p.x, p.y, p.r || 16, {
+        var ball = add(Bodies.circle(p.x, p.y, p.r || 16, {
           friction: 0.02, frictionAir: 0.002, restitution: 0.2, density: p.heavy ? 0.008 : 0.002
         }), part);
+        ball.plugin.color = colorOf(p);
       } else if (p.type === 'basket') {
         var x0 = p.x - p.w / 2, x1 = p.x + p.w / 2, top = p.y - p.h;
         var opts = { isStatic: true, friction: 0.8, restitution: 0 };
@@ -140,8 +153,17 @@
           Bodies.rectangle(x0 + WALL_T / 2, p.y - p.h / 2, WALL_T, p.h, opts),
           Bodies.rectangle(x1 - WALL_T / 2, p.y - p.h / 2, WALL_T, p.h, opts)
         ].forEach(function (b) { add(b, part); });
-        goal = { x0: x0 + WALL_T, x1: x1 - WALL_T, y0: top, y1: p.y - WALL_T };
+        baskets.push({ color: p.color || 'red', x0: x0 + WALL_T, x1: x1 - WALL_T, y0: top, y1: p.y - WALL_T });
       }
+    });
+
+    // Areas where the player may not place parts: sensors that only the placement check notices
+    (level.noBuild || []).forEach(function (z) {
+      var zone = Bodies.rectangle(z.x, z.y, z.w, z.h, { isStatic: true, isSensor: true });
+      zone.render.kind = 'zone';
+      zone.plugin.zone = z;
+      Composite.add(engine.world, zone);
+      zones.push(zone);
     });
 
     // Floor and side walls so nothing leaves the screen
@@ -169,7 +191,13 @@
       });
     });
 
-    var game = { engine: engine, byId: byId, goal: goal, level: level, width: W, height: H, touched: {} };
+    var goalBalls = Matter.Composite.allBodies(engine.world).filter(function (b) {
+      return b.plugin.color && baskets.some(function (k) { return k.color === b.plugin.color; });
+    });
+    var game = {
+      engine: engine, byId: byId, level: level, width: W, height: H, touched: {},
+      baskets: baskets, goal: baskets[0] || null, goalBalls: goalBalls
+    };
 
     // A seesaw rocks between stops on either side of level
     if (pivots.length) {
@@ -226,10 +254,17 @@
     }
   }
 
-  // The ball that has to end up in the basket: usually the one that starts the run, but in a relay
-  // the starting ball knocks another ball (level.goalBall) on its way
+  // The first ball that has to end up in a basket (the only one, on most floors)
   function goalBall(game) {
-    return game.byId[game.level.goalBall || 'ball'];
+    return game.goalBalls[0];
+  }
+
+  // True when a ball is inside a basket of its own color
+  function inOwnBasket(game, ball) {
+    var p = ball.position;
+    return game.baskets.some(function (k) {
+      return k.color === ball.plugin.color && p.x > k.x0 && p.x < k.x1 && p.y > k.y0 && p.y < k.y1;
+    });
   }
 
   var ALLOWED_DEPTH = 1.5;     // parts may touch, but not overlap
@@ -273,22 +308,19 @@
     });
   }
 
+  // True when every colored ball is in the basket of its color
   function ballInGoal(game) {
-    var ball = goalBall(game), g = game.goal;
-    if (!ball || !g) return false;
-    var p = ball.position;
-    return p.x > g.x0 && p.x < g.x1 && p.y > g.y0 && p.y < g.y1;
+    return game.goalBalls.length > 0 && game.goalBalls.every(function (b) { return inOwnBasket(game, b); });
   }
 
   // Called once per physics step after the chain starts. Returns 'win', 'fail' or null (still running).
-  // Win: the ball stays inside the basket for half a second.
-  // Fail: the ball has left its start and then stays put outside the basket for two seconds,
-  // or nothing at all moves for two seconds (the chain broke), or the run passes 40 seconds.
+  // Win: every colored ball stays inside the basket of its color for half a second.
+  // Fail: every colored ball still outside its basket has left its start and then stays put for two
+  // seconds, or nothing at all moves for two seconds (the chain broke), or the run passes 40 seconds.
   // While a tap is still available the game waits longer, since the player may be about to use it.
   function checkOutcome(Matter, game) {
-    var ball = goalBall(game), p = ball.position;
     game.steps = (game.steps || 0) + 1;
-    if (!game.ballStart) game.ballStart = { x: p.x, y: p.y };
+    if (!game.ballStart) game.ballStart = game.goalBalls.map(function (b) { return { x: b.position.x, y: b.position.y }; });
     if (ballInGoal(game)) {
       game.inGoalSteps = (game.inGoalSteps || 0) + 1;
       return game.inGoalSteps >= 30 ? 'win' : null;
@@ -296,11 +328,15 @@
     game.inGoalSteps = 0;
     // Compare positions once per second; speed alone misreads a ball rocking in place
     if (game.steps % 60 === 0) {
-      var last = game.ballLast || game.ballStart;
-      var started = Math.abs(p.x - game.ballStart.x) + Math.abs(p.y - game.ballStart.y) > 20;
-      var moved = Math.abs(p.x - last.x) + Math.abs(p.y - last.y) > 3;
-      game.ballLast = { x: p.x, y: p.y };
-      game.stillSeconds = started && !moved ? (game.stillSeconds || 0) + 1 : 0;
+      var lastAll = game.ballLast || game.ballStart;
+      var waiting = game.goalBalls.filter(function (b) { return !inOwnBasket(game, b); });
+      var stuck = waiting.length > 0 && waiting.every(function (b) {
+        var i = game.goalBalls.indexOf(b), p = b.position, s0 = game.ballStart[i], last = lastAll[i];
+        var started = Math.abs(p.x - s0.x) + Math.abs(p.y - s0.y) > 20;
+        return started && Math.abs(p.x - last.x) + Math.abs(p.y - last.y) <= 3;
+      });
+      game.ballLast = game.goalBalls.map(function (b) { return { x: b.position.x, y: b.position.y }; });
+      game.stillSeconds = stuck ? (game.stillSeconds || 0) + 1 : 0;
 
       var bodies = Matter.Composite.allBodies(game.engine.world).filter(function (b) { return !b.isStatic; });
       var prev = game.bodiesLast || [];
@@ -317,7 +353,7 @@
 
   var api = {
     buildWorld: buildWorld, makeTrayBody: makeTrayBody, trayItem: trayItem, startChain: startChain,
-    ballInGoal: ballInGoal, goalBall: goalBall,
+    ballInGoal: ballInGoal, goalBall: goalBall, inOwnBasket: inOwnBasket,
     fireSpring: fireSpring, tapAvailable: tapAvailable, placementOk: placementOk,
     checkOutcome: checkOutcome, score: score, STEP_MS: 1000 / 60
   };

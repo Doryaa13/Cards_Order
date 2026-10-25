@@ -39,6 +39,9 @@
 
     function floorCamera(i) { return fit(0, top(i), W, H, 0); }
 
+    // Watching a floor run during the tower replay: the floor and a bit of what is around it
+    function replayCamera(i) { return fit(0, top(i) - GAP * 0.4, W, H + GAP * 0.8, 24); }
+
     // The menu: close enough to tap floors comfortably, centered on one floor; drag to scroll
     function menuCamera(i) {
       var sz = size();
@@ -119,7 +122,8 @@
       ctx.fillText(text, x, y);
     }
 
-    function draw(ctx, currentIndex) {
+    // live: { index, game, mode } draws that floor's running game instead of its still picture
+    function draw(ctx, currentIndex, live) {
       var sz = size(), c = colors();
       ctx.setTransform(sz.dpr, 0, 0, sz.dpr, 0, 0);
       ctx.fillStyle = c.bg;
@@ -137,18 +141,20 @@
         ChainRender.roundRect(ctx, 0, 0, W, H, 12 / cam.s);
         ctx.save();
         ctx.clip();
-        ChainRender.drawFloor(ctx, f.game, { scale: cam.s, mode: 'static', silhouette: !f.open });
+        if (live && live.index === i) ChainRender.drawFloor(ctx, live.game, { scale: cam.s, mode: live.mode || 'run' });
+        else ChainRender.drawFloor(ctx, f.game, { scale: cam.s, mode: 'static', silhouette: !f.open });
         ctx.restore();
         ChainRender.roundRect(ctx, 0, 0, W, H, 12 / cam.s);
-        ctx.strokeStyle = i === currentIndex ? c.accent : c.border;
-        ctx.lineWidth = (i === currentIndex ? 3 : 1) / cam.s;
+        var highlight = live ? live.index === i : i === currentIndex;
+        ctx.strokeStyle = highlight ? c.accent : c.border;
+        ctx.lineWidth = (highlight ? 3 : 1) / cam.s;
         ctx.stroke();
         ctx.restore();
 
         // One line above each floor: number and name, then stars, "you are here", or locked
         var name = levels[i].name.replace(/^[^:]+: /, '');
         var ly = y - 16 / cam.s;   // a fixed distance above the floor on screen, at any zoom
-        var here = i === currentIndex && !f.stars;
+        var here = !live && i === currentIndex && !f.stars;
         if (!f.open) {
           label(ctx, (i + 1) + ' · נעולה', W / 2, ly, 12, c.muted);
         } else {
@@ -187,6 +193,7 @@
       },
       setCamera: function (c) { cam = Object.assign({}, c); anim = null; },
       menuCamera: menuCamera,
+      replayCamera: replayCamera,
       // Scrolls the tower by a drag of dy screen pixels
       pan: function (dy) { if (!anim) cam = clampCamera({ x: cam.x, y: cam.y - dy / cam.s, s: cam.s }); },
       resetColors: function () { css = null; }

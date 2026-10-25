@@ -3,10 +3,12 @@
 (function (root) {
   var COLORS = {
     sky: '#fbf7f0', wall: '#6b5b4b', domino: ['#2f6fb0', '#e0662f', '#3c9a5f', '#c9a227'],
-    ball: '#d63c3c', basket: '#8a5a2b', goal: 'rgba(60,154,95,0.18)',
+    basket: '#8a5a2b', zone: 'rgba(214,60,60,0.55)', zoneFill: 'rgba(214,60,60,0.07)',
+    // Ball colors; a basket is tinted with the color of the ball it takes. Helper balls are grey.
+    balls: { red: '#d63c3c', blue: '#2f6fb0', yellow: '#e0a52f', green: '#3c9a5f' }, helperBall: '#8d8578',
     movable: '#7a4fc4', handle: '#7a4fc4', invalid: '#d63c3c', selected: '#fff', touched: '#1fa36f',
     charge: '#e0662f', spent: '#9a948a', pipe: '#8d8578', pipeEdge: '#6f685d',
-    silhouetteSky: '#e7e1d6', silhouette: '#cfc7b9', otherBall: '#3a6ea5', heavyRim: '#1d3550'
+    silhouetteSky: '#e7e1d6', silhouette: '#cfc7b9', heavyRim: '#3b352d'
   };
   var PIPE_W = 44;
 
@@ -171,7 +173,7 @@
       }
     }
 
-    // The ball that has to reach the basket is red; other balls are blue. A heavy ball has a dark rim.
+    // A colored ball has to reach the basket of its color; helper balls are grey. A heavy ball has a dark rim.
     function drawBall(b, fill) {
       ctx.beginPath();
       ctx.arc(b.position.x, b.position.y, b.circleRadius, 0, Math.PI * 2);
@@ -202,17 +204,50 @@
     ctx.fillStyle = view.silhouette ? COLORS.silhouetteSky : COLORS.sky;
     ctx.fillRect(0, 0, W, H);
 
-    var g = game.goal;
-    if (g && !view.silhouette) {
-      ctx.fillStyle = COLORS.goal;
-      ctx.fillRect(g.x0, g.y0, g.x1 - g.x0, g.y1 - g.y0);
+    if (!view.silhouette) {
+      // Each basket's inside is tinted with its color, with a ball-sized ring of that color at the bottom
+      game.baskets.forEach(function (k) {
+        var c = COLORS.balls[k.color] || COLORS.balls.red;
+        ctx.save();
+        ctx.globalAlpha = 0.16;
+        ctx.fillStyle = c;
+        ctx.fillRect(k.x0, k.y0, k.x1 - k.x0, k.y1 - k.y0);
+        ctx.restore();
+        ctx.strokeStyle = c;
+        ctx.lineWidth = 3;
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        ctx.arc((k.x0 + k.x1) / 2, k.y1 - 18, 15, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      });
+      // No-build zones: a faint fill with diagonal stripes
+      game.engine.world.bodies.forEach(function (b) {
+        if (b.render.kind !== 'zone') return;
+        var z = b.plugin.zone;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(z.x - z.w / 2, z.y - z.h / 2, z.w, z.h);
+        ctx.fillStyle = COLORS.zoneFill;
+        ctx.fill();
+        ctx.clip();
+        ctx.strokeStyle = COLORS.zone;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (var d = -z.h; d < z.w; d += 18) {
+          ctx.moveTo(z.x - z.w / 2 + d, z.y + z.h / 2);
+          ctx.lineTo(z.x - z.w / 2 + d + z.h, z.y - z.h / 2);
+        }
+        ctx.stroke();
+        ctx.restore();
+      });
     }
     if (game.level.launch) drawEntryPipe(ctx, game, view.silhouette);
 
     var dominoIndex = 0;
     Matter.Composite.allBodies(game.engine.world).forEach(function (b) {
       var kind = b.render.kind;
-      if (kind === 'bound') return;
+      if (kind === 'bound' || kind === 'zone') return;
       var tray = b.plugin.part && b.plugin.part.tray;
       if (view.silhouette) {
         if (tray) return;
@@ -221,7 +256,7 @@
         return;
       }
       if (tray) drawTrayPart(b);
-      else if (kind === 'ball') drawBall(b, b.plugin.part.id === (game.level.goalBall || 'ball') ? COLORS.ball : COLORS.otherBall);
+      else if (kind === 'ball') drawBall(b, b.plugin.color ? COLORS.balls[b.plugin.color] : COLORS.helperBall);
       else if (kind === 'domino') drawBody(b, COLORS.domino[dominoIndex++ % COLORS.domino.length]);
       else if (kind === 'basket') drawBody(b, COLORS.basket);
       else drawBody(b, COLORS.wall);

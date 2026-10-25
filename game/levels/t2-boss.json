@@ -1,0 +1,22 @@
+{
+  "id": "t2-boss",
+  "name": "קומה 8: המכונה המלאה",
+  "notes": "Boss floor: build the ramp-and-spring V yourself, then catch the throw with the funnel above the narrow cup. The striped zone covers the easy low spot, so the funnel has to go higher.",
+  "world": {"width": 600, "height": 1000},
+  "launch": {"vx": 0, "vy": 0},
+  "noBuild": [
+    {"x": 470, "y": 815, "w": 260, "h": 110}
+  ],
+  "tray": [
+    {"id": "b", "type": "wall", "w": 240, "h": 16},
+    {"id": "s", "type": "spring"},
+    {"id": "f", "type": "funnel"}
+  ],
+  "solutions": [
+    {"stars": 3, "tap": {"part": "s", "step": 170}, "placements": {"b": {"x": 206, "y": 715, "angle": 160}, "s": {"x": 50, "y": 742, "angle": 45}, "f": {"x": 480, "y": 690, "angle": 0}}}
+  ],
+  "parts": [
+    {"type": "ball", "id": "ball", "x": 250, "y": 40, "r": 16},
+    {"type": "basket", "x": 470, "y": 990, "w": 90, "h": 80}
+  ]
+}
