@@ -1,12 +1,14 @@
-// Edit mode: drag parts from the tray onto the board, move them, rotate them with the round handle,
-// or drag them back to the tray. Works with mouse and touch through pointer events.
-// Parts may not overlap others or leave the board.
+// Edit mode: drag parts from the tray onto the board, move and rotate them, or drag them back to the
+// tray. A selected part gets two handles, like in design apps: a move handle beside it and a rotate
+// handle past its end, both sized in screen pixels so small parts are as easy to grab as big ones.
+// Works with mouse and touch through pointer events. Parts may not overlap others or leave the board.
 (function (root) {
   var deg = Math.PI / 180;
   var ROTATE_SNAP = 5 * deg;
   var TOUCH_SLOP_PX = 22;      // how far from a part a finger may land and still grab it
-  var HANDLE_GAP = 34;         // distance from the end of the part to the rotation handle (world units)
-  var HANDLE_R = 16;           // drawn radius of the rotation handle (world units)
+  var HANDLE_R_PX = 17;        // drawn radius of the move and rotate handles
+  var HANDLE_HIT_PX = 28;      // how far from a handle's center a finger still grabs it
+  var HANDLE_GAP_PX = 14;      // space between the part and its handles
   var ALLOWED_DEPTH = 1.5;     // touching is fine, real overlap is not
   var TOUCH_LIFT_PX = 56;      // a part pulled from the tray by finger floats above it so it stays visible
 
@@ -45,18 +47,27 @@
       return best;
     }
 
-    // The handle sits past one end of the part's long side, on whichever end stays inside the board.
-    function handleFor(body) {
-      var part = body.plugin.part;
+    // Handle positions for a part: rotate past one end of its long side, move beside its middle.
+    // Each picks the side that stays inside the board.
+    function handlesFor(body) {
+      var part = body.plugin.part, k = 1 / opts.getScale();
       var w = part.w || 12, h = part.h || 64;
       var axis = w >= h ? 0 : -Math.PI / 2;
-      var reach = Math.max(w, h) / 2 + HANDLE_GAP;
-      var sides = [0, Math.PI].map(function (flip) {
-        var a = body.angle + axis + flip;
-        return { x: body.position.x + Math.cos(a) * reach, y: body.position.y + Math.sin(a) * reach, offset: axis + flip };
-      });
-      var inside = function (p) { return p.x > HANDLE_R && p.x < game.width - HANDLE_R && p.y > HANDLE_R && p.y < game.height - HANDLE_R; };
-      return inside(sides[0]) || !inside(sides[1]) ? sides[0] : sides[1];
+      var long = Math.max(w, h), thick = Math.min(w, h);
+      var r = HANDLE_R_PX * k, gap = HANDLE_GAP_PX * k;
+      var inside = function (p) { return p.x > r && p.x < game.width - r && p.y > r && p.y < game.height - r; };
+      function pick(dirs, reach) {
+        var spots = dirs.map(function (d) {
+          var a = body.angle + d;
+          return { x: body.position.x + Math.cos(a) * reach, y: body.position.y + Math.sin(a) * reach, offset: d };
+        });
+        return inside(spots[0]) || !inside(spots[1]) ? spots[0] : spots[1];
+      }
+      return {
+        r: r,
+        rotate: pick([axis, axis + Math.PI], long / 2 + gap + r),
+        move: pick([axis + Math.PI / 2, axis - Math.PI / 2], thick / 2 + gap + r)
+      };
     }
 
     function placementOk(body) {
@@ -96,14 +107,19 @@
         if (d <= best) { best = d; hit = b; }
       });
 
-      // The selected part's rotate handle wins, unless the pointer is squarely on another part
-      // and not on the handle circle itself (the handle can sit over a neighbouring part)
+      // Handles of the selected part come first when the pointer is on one of them. Near a handle
+      // but squarely on another part, the other part wins (a handle can sit over a neighbour).
       if (selected) {
-        var h = handleFor(selected);
-        var dh = Math.hypot(p.x - h.x, p.y - h.y);
+        var hs = handlesFor(selected);
+        var dr = Math.hypot(p.x - hs.rotate.x, p.y - hs.rotate.y);
+        var dm = Math.hypot(p.x - hs.move.x, p.y - hs.move.y);
+        var reach = HANDLE_HIT_PX / opts.getScale();
         var onOtherPart = hit && hit !== selected && best === 0;
-        if (dh < HANDLE_R || (dh < HANDLE_R + slop && !onOtherPart)) {
-          drag = { body: selected, mode: 'rotate', offset: h.offset };
+        var nearest = dr <= dm ? 'rotate' : 'move', dn = Math.min(dr, dm);
+        if (dn < hs.r || (dn < reach && !onOtherPart)) {
+          drag = nearest === 'rotate'
+            ? { body: selected, mode: 'rotate', offset: hs.rotate.offset }
+            : { body: selected, mode: 'move', dx: selected.position.x - p.x, dy: selected.position.y - p.y };
         }
       }
       if (!drag) {
@@ -167,7 +183,6 @@
     window.addEventListener('pointercancel', onUp);
 
     return {
-      // Start with the first movable part selected so its rotate handle is visible right away
       setGame: function (g) { game = g; drag = null; invalid = false; overTray = false; selected = null; },
       beginFromTray: beginFromTray,
       isDraggingOverTray: function () { return !!drag && overTray; },
@@ -191,31 +206,54 @@
 
       drawOverlay: function (ctx, colors) {
         if (!enabled || !selected) return;
-        var h = handleFor(selected), c = selected.position;
-        ctx.strokeStyle = invalid ? colors.invalid : colors.handle;
-        ctx.lineWidth = 3;
-        ctx.setLineDash([6, 6]);
-        ctx.beginPath();
-        ctx.moveTo(c.x, c.y);
-        ctx.lineTo(h.x, h.y);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle = invalid ? colors.invalid : colors.handle;
-        ctx.beginPath();
-        ctx.arc(h.x, h.y, HANDLE_R, 0, Math.PI * 2);
-        ctx.fill();
-        // Curved arrow inside the handle
+        var hs = handlesFor(selected), c = selected.position, r = hs.r, k = 1 / opts.getScale();
+        var color = invalid ? colors.invalid : colors.handle;
+        [hs.rotate, hs.move].forEach(function (h) {
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 2 * k;
+          ctx.setLineDash([4 * k, 4 * k]);
+          ctx.beginPath();
+          ctx.moveTo(c.x, c.y);
+          ctx.lineTo(h.x, h.y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(h.x, h.y, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#fff';
+          ctx.lineWidth = 2 * k;
+          ctx.stroke();
+        });
         ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 2.5;
+        ctx.lineWidth = 2.2 * k;
+        ctx.lineCap = 'round';
+
+        // Rotate icon: an open circle with an arrow head
+        var R = hs.rotate, ri = r * 0.5;
         ctx.beginPath();
-        ctx.arc(h.x, h.y, HANDLE_R * 0.5, -0.3, Math.PI * 1.3);
+        ctx.arc(R.x, R.y, ri, -0.3, Math.PI * 1.35);
         ctx.stroke();
-        var ax = h.x + Math.cos(Math.PI * 1.3) * HANDLE_R * 0.5, ay = h.y + Math.sin(Math.PI * 1.3) * HANDLE_R * 0.5;
+        var ax = R.x + Math.cos(-0.3) * ri, ay = R.y + Math.sin(-0.3) * ri;
         ctx.beginPath();
-        ctx.moveTo(ax - 4, ay - 3);
+        ctx.moveTo(ax - 4 * k, ay - 1 * k);
         ctx.lineTo(ax, ay);
-        ctx.lineTo(ax + 3, ay - 5);
+        ctx.lineTo(ax + 1.5 * k, ay - 4.5 * k);
         ctx.stroke();
+
+        // Move icon: four arrows
+        var M = hs.move, mi = r * 0.55, hd = 3.5 * k;
+        ctx.beginPath();
+        ctx.moveTo(M.x - mi, M.y); ctx.lineTo(M.x + mi, M.y);
+        ctx.moveTo(M.x, M.y - mi); ctx.lineTo(M.x, M.y + mi);
+        [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (d) {
+          var tx = M.x + d[0] * mi, ty = M.y + d[1] * mi;
+          ctx.moveTo(tx - d[0] * hd - d[1] * hd, ty - d[1] * hd - d[0] * hd);
+          ctx.lineTo(tx, ty);
+          ctx.lineTo(tx - d[0] * hd + d[1] * hd, ty - d[1] * hd + d[0] * hd);
+        });
+        ctx.stroke();
+        ctx.lineCap = 'butt';
       }
     };
   }

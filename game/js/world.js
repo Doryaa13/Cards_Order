@@ -5,7 +5,7 @@
 
   var TOUCH_MIN_SPEED = 0.2;   // a resting piece leaning on a tray part does not count as touching it
 
-  var SPRING_W = 70, SPRING_H = 24;
+  var SPRING_W = 84, SPRING_H = 28;
   var SPRING_KICK = 16;        // speed added along the spring's facing direction when it fires
   var SPRING_REACH = 40;       // how far above its pad the spring still catches things
 

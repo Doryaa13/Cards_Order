@@ -130,6 +130,7 @@ body {
 .tray.drop { border-color: var(--part); border-style: solid; }
 .tray.locked { opacity: 0.5; pointer-events: none; }
 .tray-item {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -143,6 +144,20 @@ body {
   touch-action: none;
 }
 .tray-spring { width: 34px; height: 22px; fill: var(--part); stroke: var(--part); }
+.tray-badge {
+  position: absolute;
+  top: -7px;
+  left: -7px;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  border: 2px solid var(--panel);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 16px;
+}
 .tray-bar { display: block; height: 8px; border-radius: 2px; background: var(--part); }
 .tray-empty { color: var(--muted); font-size: 0.9rem; }
 .win-stars { font-size: 2.2rem; letter-spacing: 4px; color: var(--star); line-height: 1; }

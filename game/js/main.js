@@ -16,7 +16,8 @@
   var COLORS = {
     sky: '#fbf7f0', wall: '#6b5b4b', domino: ['#2f6fb0', '#e0662f', '#3c9a5f', '#c9a227'],
     ball: '#d63c3c', basket: '#8a5a2b', goal: 'rgba(60,154,95,0.18)',
-    movable: '#7a4fc4', handle: '#7a4fc4', invalid: '#d63c3c', selected: '#fff', touched: '#1fa36f'
+    movable: '#7a4fc4', handle: '#7a4fc4', invalid: '#d63c3c', selected: '#fff', touched: '#1fa36f',
+    charge: '#e0662f', spent: '#9a948a'
   };
 
   // mode: 'edit' (player arranges tray parts), 'run' (physics running), 'done' (result shown)
@@ -52,8 +53,8 @@
       var btn = document.createElement('button');
       btn.className = 'tray-item';
       if (item.type === 'spring') {
-        btn.setAttribute('aria-label', 'קפיץ');
-        btn.innerHTML = SPRING_ICON;
+        btn.setAttribute('aria-label', 'קפיץ, נגיעה אחת בכל ריצה');
+        btn.innerHTML = SPRING_ICON + '<span class="tray-badge">1</span>';
       } else {
         btn.setAttribute('aria-label', 'רמפה באורך ' + item.w);
         var bar = document.createElement('span');
@@ -77,9 +78,11 @@
     renderTray();
     trayEl.classList.toggle('drop', editor.isDraggingOverTray());
     btnPlay.disabled = left > 0;
+    var hasSpring = trayItems.some(function (it) { return it.type === 'spring'; });
     statusEl.textContent = left > 0
       ? 'גררו את החלקים מהמאגר ללוח (נשארו ' + left + ')'
-      : 'אפשר לסובב עם העיגול. מוכנים? לחצו "הפעל"';
+      : hasSpring ? 'בזמן הריצה אפשר לגעת בקפיץ פעם אחת. מוכנים? "הפעל"'
+      : 'מוכנים? לחצו "הפעל"';
   }
 
   // Back to edit mode with the player's arrangement
@@ -145,6 +148,8 @@
     var text = 'חלקים שנגעו: ' + s.touched + ' מתוך ' + s.total;
     if (ChainWorld.tapAvailable(Matter, game)) {
       text += game.stillSeconds >= 1 ? ' · געו בקפיץ!' : ' · נגיעה אחת זמינה';
+    } else if (game.tapUsed) {
+      text += ' · הנגיעה נוצלה';
     }
     if (text === lastRunText) return;
     lastRunText = text;
@@ -217,7 +222,8 @@
       ctx.lineTo(i % 2 ? w / 2 - 10 : -w / 2 + 10, y);
     }
     ctx.stroke();
-    if (mode === 'run' && ChainWorld.tapAvailable(Matter, game)) {
+    var charged = !game.tapUsed;
+    if (mode === 'run' && charged) {
       var pulse = 0.5 + 0.5 * Math.sin(performance.now() / 180);
       ctx.strokeStyle = 'rgba(224,102,47,' + (0.35 + 0.5 * pulse) + ')';
       ctx.lineWidth = 3;
@@ -225,6 +231,53 @@
       ctx.arc(0, 0, w / 2 + 8 + 4 * pulse, 0, Math.PI * 2);
       ctx.stroke();
     }
+    ctx.restore();
+    drawChargeBadge(body, charged);
+    if (mode === 'run' && charged) drawCallout(body, 'געו כאן · פעם אחת');
+    if (fired < 60) drawCallout(body, 'נוצל', 1 - fired / 60);
+  }
+
+  // Sizes for overlay text and badges are in screen pixels, converted to world units
+  function px(n) { return n / scale; }
+
+  // Badge on a spring's top-left corner (clear of the rotate handle): "1" while its tap is still
+  // available, a grey "0" once spent
+  function drawChargeBadge(body, charged) {
+    var part = body.plugin.part, r = px(10);
+    var x = body.position.x - Math.cos(body.angle) * part.w / 2 + Math.sin(body.angle) * part.h / 2;
+    var y = body.position.y - Math.sin(body.angle) * part.w / 2 - Math.cos(body.angle) * part.h / 2;
+    ctx.fillStyle = charged ? COLORS.charge : COLORS.spent;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = px(2);
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.font = '700 ' + px(13) + 'px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(charged ? '1' : '0', x, y + px(1));
+  }
+
+  // A small label next to a part: above it, or below when it sits near the top of the board
+  function drawCallout(body, text, alpha) {
+    ctx.save();
+    ctx.globalAlpha = alpha == null ? 1 : alpha;
+    ctx.font = '600 ' + px(13) + 'px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    var tw = ctx.measureText(text).width + px(16), th = px(24);
+    var below = body.bounds.min.y - px(40) < 0;
+    var x = Math.min(Math.max(body.position.x, tw / 2 + px(4)), W - tw / 2 - px(4));
+    var y = below ? body.bounds.max.y + px(22) : body.bounds.min.y - px(22);
+    ctx.fillStyle = COLORS.charge;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x - tw / 2, y - th / 2, tw, th, px(8));
+    else ctx.rect(x - tw / 2, y - th / 2, tw, th);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.fillText(text, x, y + px(1));
     ctx.restore();
   }
 
