@@ -8,7 +8,7 @@
   var btnReset = document.getElementById('btn-reset');
   var btnTower = document.getElementById('btn-tower');
   var btnNext = document.getElementById('btn-next');
-  var btnAgain = document.getElementById('btn-again');
+  var btnEdit = document.getElementById('btn-edit');
   var titleEl = document.getElementById('level-name');
   var statusEl = document.getElementById('status');
   var winEl = document.getElementById('win');
@@ -227,11 +227,6 @@
     edit();
   }
 
-  function playAgain() {
-    placements = {};
-    edit();
-  }
-
   function finish(outcome) {
     mode = 'done';
     btnReset.textContent = '✎ חזרה לעריכה';
@@ -336,7 +331,8 @@
   btnReset.addEventListener('click', onResetClick);
   btnTower.addEventListener('click', function () { if (view === 'floor') showTower(false); });
   btnNext.addEventListener('click', goToNextFloor);
-  btnAgain.addEventListener('click', playAgain);
+  // Back to editing with the arrangement that just won, to improve on it
+  btnEdit.addEventListener('click', edit);
   canvas.addEventListener('pointerdown', onRunTap);
   canvas.addEventListener('pointerdown', onTowerDown);
   window.addEventListener('pointermove', onTowerMove);

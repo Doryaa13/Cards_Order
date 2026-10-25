@@ -10,7 +10,7 @@
     {"id": "s", "type": "spring"}
   ],
   "solutions": [
-    {"stars": 3, "tap": {"part": "s", "step": 450}, "placements": {"a": {"x": 455, "y": 470, "angle": 160}, "b": {"x": 206, "y": 715, "angle": 160}, "s": {"x": 50, "y": 742, "angle": 35}}},
+    {"stars": 3, "tap": {"part": "s", "step": 440}, "placements": {"a": {"x": 455, "y": 470, "angle": 160}, "b": {"x": 206, "y": 715, "angle": 160}, "s": {"x": 50, "y": 742, "angle": 45}}},
     {"stars": 1, "placements": {"a": {"x": 455, "y": 470, "angle": 160}, "b": {"x": 330, "y": 740, "angle": 20}, "s": {"x": 60, "y": 60, "angle": 0}}}
   ],
   "parts": [
