@@ -1,43 +1,165 @@
-// Game loop, rendering and the edit / run / result flow.
+// The game's flow: the tower (menu and opening shot) and the floor being played, with its
+// edit / run / result steps, the tray, and saved progress.
 (function () {
-  var level = window.LEVELS[0];
-  var W = level.world.width, H = level.world.height;
   var canvas = document.getElementById('canvas');
   var ctx = canvas.getContext('2d');
+  var stage = document.getElementById('stage');
   var btnPlay = document.getElementById('btn-play');
   var btnReset = document.getElementById('btn-reset');
+  var btnTower = document.getElementById('btn-tower');
+  var btnNext = document.getElementById('btn-next');
+  var btnAgain = document.getElementById('btn-again');
+  var titleEl = document.getElementById('level-name');
   var statusEl = document.getElementById('status');
   var winEl = document.getElementById('win');
-  document.getElementById('level-name').textContent = level.name;
-
   var trayEl = document.getElementById('tray');
-  var trayItems = level.tray || [];
-
-  var COLORS = {
-    sky: '#fbf7f0', wall: '#6b5b4b', domino: ['#2f6fb0', '#e0662f', '#3c9a5f', '#c9a227'],
-    ball: '#d63c3c', basket: '#8a5a2b', goal: 'rgba(60,154,95,0.18)',
-    movable: '#7a4fc4', handle: '#7a4fc4', invalid: '#d63c3c', selected: '#fff', touched: '#1fa36f',
-    charge: '#e0662f', spent: '#9a948a'
-  };
-
-  // mode: 'edit' (player arranges tray parts), 'run' (physics running), 'done' (result shown)
-  var game, mode, accumulator, lastTime, scale;
-  var placements = {};   // the player's arrangement, kept across runs
-  var lastRunText = null;
-
-  var editor = ChainEditor.create({
-    canvas: canvas,
-    getScale: function () { return scale; },
-    isOverTray: function (e) { return e.clientY > canvas.getBoundingClientRect().bottom; },
-    onChange: function () { if (mode === 'edit') updateEditUi(); }
-  });
 
   var SPRING_ICON = '<svg class="tray-spring" viewBox="0 0 40 26" aria-hidden="true">' +
     '<rect x="4" y="2" width="32" height="5" rx="1.5"/>' +
     '<polyline points="8,9 32,12 8,15 32,18 8,21" fill="none" stroke-width="2.2"/>' +
     '<rect x="4" y="21" width="32" height="4" rx="1.5"/></svg>';
 
+  var levels, progress, tower;
+  // view: 'tower' or 'floor'. mode (inside a floor): 'edit', 'run' or 'done'.
+  var view = null, mode = null;
+  var floorIndex = 0, level = null, trayItems = [];
+  var game, accumulator = 0, lastTime = null, scale = 1;
+  var placements = {};   // the player's arrangement on this floor, kept across runs
+  var lastRunText = null;
+
+  var editor = ChainEditor.create({
+    canvas: canvas,
+    getScale: function () { return scale; },
+    isOverTray: function (e) { return e.clientY > canvas.getBoundingClientRect().bottom; },
+    onChange: function () { if (view === 'floor' && mode === 'edit') updateEditUi(); }
+  });
+
   function starText(n) { return '★★★'.slice(0, n) + '☆☆☆'.slice(0, 3 - n); }
+
+  // ---- Canvas size: the whole stage for the tower, the floor's aspect ratio while playing ----
+
+  function stageSize() {
+    return { w: stage.clientWidth, h: stage.clientHeight, dpr: window.devicePixelRatio || 1 };
+  }
+
+  function resize() {
+    var sz = stageSize();
+    if (view === 'tower') {
+      canvas.style.width = sz.w + 'px';
+      canvas.style.height = sz.h + 'px';
+      canvas.width = Math.floor(sz.w * sz.dpr);
+      canvas.height = Math.floor(sz.h * sz.dpr);
+      return;
+    }
+    var W = level.world.width, H = level.world.height;
+    scale = Math.min(sz.w / W, sz.h / H);
+    canvas.style.width = Math.floor(W * scale) + 'px';
+    canvas.style.height = Math.floor(H * scale) + 'px';
+    canvas.width = Math.floor(W * scale * sz.dpr);
+    canvas.height = Math.floor(H * scale * sz.dpr);
+  }
+
+  function totalStars() {
+    return levels.reduce(function (sum, l) { return sum + progress.stars(l.id); }, 0);
+  }
+
+  // ---- The tower ----
+
+  // Shared setup when the tower takes over the screen
+  function towerChrome(trayText) {
+    view = 'tower';
+    mode = null;
+    editor.setEnabled(false);
+    document.body.classList.add('in-tower');
+    winEl.hidden = true;
+    titleEl.textContent = 'המגדל · ★ ' + totalStars() + ' מתוך ' + levels.length * 3;
+    btnTower.hidden = true;
+    btnReset.hidden = true;
+    btnPlay.disabled = false;
+    btnPlay.textContent = '▶ לקומה ' + (progress.currentIndex(levels) + 1);
+    trayEl.classList.remove('locked', 'drop');
+    trayEl.innerHTML = '<p class="tray-empty">' + trayText + '</p>';
+    statusEl.textContent = ' ';
+    tower.build();
+    resize();
+  }
+
+  // Shows the tower. intro: the opening shot (whole tower, then down into the current floor).
+  // Otherwise the camera zooms out from the floor just left, and the player picks a floor.
+  function showTower(intro) {
+    var cur = progress.currentIndex(levels);
+    towerChrome(intro ? 'נגיעה מדלגת' : 'געו בקומה כדי לשחק בה. גררו כדי לגלול');
+    if (intro) {
+      tower.setCamera(tower.towerCamera());
+      // Hold on the whole tower for a moment, then fly down into the current floor
+      tower.animate([tower.towerCamera(), tower.floorCamera(cur)], 2600, function () { enterFloor(cur); });
+    } else {
+      tower.setCamera(tower.floorCamera(floorIndex));
+      tower.animate([tower.menuCamera(floorIndex)], 900);
+    }
+  }
+
+  function flyToFloor(i) {
+    trayEl.innerHTML = '<p class="tray-empty"> </p>';
+    tower.animate([tower.floorCamera(i)], 1200, function () { enterFloor(i); });
+  }
+
+  // In the tower a drag scrolls and a tap (little movement) picks a floor
+  var towerPointer = null;
+  function onTowerDown(e) {
+    if (view !== 'tower') return;
+    if (tower.skip()) return;
+    towerPointer = { id: e.pointerId, x: e.clientX, y: e.clientY, lastY: e.clientY, moved: false };
+    e.preventDefault();
+  }
+  function onTowerMove(e) {
+    if (!towerPointer || e.pointerId !== towerPointer.id || view !== 'tower') return;
+    if (Math.abs(e.clientY - towerPointer.y) + Math.abs(e.clientX - towerPointer.x) > 8) towerPointer.moved = true;
+    if (towerPointer.moved) tower.pan(e.clientY - towerPointer.lastY);
+    towerPointer.lastY = e.clientY;
+  }
+  function onTowerUp(e) {
+    var p = towerPointer;
+    towerPointer = null;
+    if (!p || e.pointerId !== p.id || view !== 'tower' || p.moved) return;
+    onTowerTap(e);
+  }
+
+  function onTowerTap(e) {
+    var i = tower.floorAt(e.clientX, e.clientY, canvas.getBoundingClientRect());
+    if (i < 0) return;
+    if (!progress.unlocked(levels, i)) {
+      statusEl.textContent = 'קומה ' + (i + 1) + ' נעולה. השיגו כוכב בקומה שמעליה כדי לפתוח אותה';
+      return;
+    }
+    flyToFloor(i);
+  }
+
+  // After a win: down the pipe to the next floor, zooming out just enough to see both
+  function goToNextFloor() {
+    var from = floorIndex, to = floorIndex + 1;
+    if (to >= levels.length) { showTower(false); return; }
+    towerChrome(' ');
+    tower.setCamera(tower.floorCamera(from));
+    tower.animate([tower.betweenCamera(from, to), tower.floorCamera(to)], 1800, function () { enterFloor(to); });
+  }
+
+  // ---- A floor ----
+
+  function enterFloor(i) {
+    view = 'floor';
+    floorIndex = i;
+    level = levels[i];
+    trayItems = level.tray || [];
+    placements = progress.placements(level.id);
+    document.body.classList.remove('in-tower');
+    titleEl.textContent = level.name;
+    btnTower.hidden = false;
+    btnReset.hidden = false;
+    btnPlay.textContent = '▶ הפעל';
+    resize();
+    edit();
+  }
 
   // Tray buttons for the parts not yet on the board, each drawn to scale against the others
   var trayKey = null;
@@ -115,10 +237,13 @@
     btnReset.textContent = '✎ חזרה לעריכה';
     var s = ChainWorld.score(game);
     if (outcome === 'win' && s.stars > 0) {
+      progress.saveWin(level.id, s.stars, placements);
+      var last = floorIndex === levels.length - 1;
       document.getElementById('win-stars').textContent = starText(s.stars);
       document.getElementById('win-text').textContent =
         'הכדור נגע ב-' + s.touched + ' מתוך ' + s.total + ' חלקים' +
         (s.stars < 3 ? '. נסו לגעת בכולם בשביל 3 כוכבים' : '. מושלם!');
+      btnNext.textContent = last ? '↑ למגדל' : '▼ לקומה ' + (floorIndex + 2);
       winEl.hidden = false;
       statusEl.textContent = 'הכדור בסל!';
     } else if (outcome === 'win') {
@@ -130,8 +255,13 @@
   }
 
   function play() {
+    if (view === 'tower') {
+      if (!tower.skip()) flyToFloor(progress.currentIndex(levels));
+      return;
+    }
     if (mode !== 'edit' || btnPlay.disabled) return;
     placements = editor.placements();
+    progress.saveDraft(level.id, placements);
     editor.setEnabled(false);
     mode = 'run';
     lastRunText = null;
@@ -158,7 +288,7 @@
 
   // One tap per run: it fires the tapped spring, or the only spring on the board wherever you tap
   function onRunTap(e) {
-    if (mode !== 'run' || !ChainWorld.tapAvailable(Matter, game)) return;
+    if (view !== 'floor' || mode !== 'run' || !ChainWorld.tapAvailable(Matter, game)) return;
     var rect = canvas.getBoundingClientRect();
     var p = { x: (e.clientX - rect.left) / scale, y: (e.clientY - rect.top) / scale };
     var springs = Matter.Composite.allBodies(game.engine.world).filter(function (b) {
@@ -174,220 +304,56 @@
     }
   }
 
-  // Fit the canvas to the stage while keeping the world's aspect ratio
-  function resize() {
-    var stage = canvas.parentElement;
-    var maxW = stage.clientWidth, maxH = stage.clientHeight;
-    scale = Math.min(maxW / W, maxH / H);
-    var dpr = window.devicePixelRatio || 1;
-    canvas.style.width = Math.floor(W * scale) + 'px';
-    canvas.style.height = Math.floor(H * scale) + 'px';
-    canvas.width = Math.floor(W * scale * dpr);
-    canvas.height = Math.floor(H * scale * dpr);
-    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
-  }
+  // ---- Main loop. Fixed-step physics keeps the simulation identical on every device. ----
 
-  function tracePath(body) {
-    var v = body.vertices;
-    ctx.beginPath();
-    ctx.moveTo(v[0].x, v[0].y);
-    for (var i = 1; i < v.length; i++) ctx.lineTo(v[i].x, v[i].y);
-    ctx.closePath();
-  }
-
-  function drawBody(body, fill) {
-    tracePath(body);
-    ctx.fillStyle = fill;
-    ctx.fill();
-  }
-
-  // A spring: base plate, coil and pad, drawn in the body's own frame. The pad pops up briefly when fired.
-  // While its tap is still available during a run, a pulsing ring shows it can be tapped.
-  function drawSpring(body, fill) {
-    var part = body.plugin.part, w = part.w, h = part.h;
-    var fired = body.plugin.firedAt != null ? game.steps - body.plugin.firedAt : Infinity;
-    var pop = fired < 14 ? 12 * Math.sin(Math.PI * fired / 14) : 0;
-    ctx.save();
-    ctx.translate(body.position.x, body.position.y);
-    ctx.rotate(body.angle);
-    ctx.fillStyle = fill;
-    ctx.fillRect(-w / 2, h / 2 - 6, w, 6);
-    ctx.fillRect(-w / 2, -h / 2 - pop, w, 7);
-    ctx.strokeStyle = fill;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    var top = -h / 2 + 7 - pop, bottom = h / 2 - 6, n = 4;
-    for (var i = 0; i <= n; i++) {
-      var y = top + (bottom - top) * i / n;
-      ctx.lineTo(i % 2 ? w / 2 - 10 : -w / 2 + 10, y);
-    }
-    ctx.stroke();
-    var charged = !game.tapUsed;
-    if (mode === 'run' && charged) {
-      var pulse = 0.5 + 0.5 * Math.sin(performance.now() / 180);
-      ctx.strokeStyle = 'rgba(224,102,47,' + (0.35 + 0.5 * pulse) + ')';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(0, 0, w / 2 + 8 + 4 * pulse, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-    ctx.restore();
-    drawChargeBadge(body, charged);
-    if (mode === 'run' && charged) drawCallout(body, 'געו כאן · פעם אחת');
-    if (fired < 60) drawCallout(body, 'נוצל', 1 - fired / 60);
-  }
-
-  // Sizes for overlay text and badges are in screen pixels, converted to world units
-  function px(n) { return n / scale; }
-
-  // Badge on a spring's top-left corner (clear of the rotate handle): "1" while its tap is still
-  // available, a grey "0" once spent
-  function drawChargeBadge(body, charged) {
-    var part = body.plugin.part, r = px(10);
-    var x = body.position.x - Math.cos(body.angle) * part.w / 2 + Math.sin(body.angle) * part.h / 2;
-    var y = body.position.y - Math.sin(body.angle) * part.w / 2 - Math.cos(body.angle) * part.h / 2;
-    ctx.fillStyle = charged ? COLORS.charge : COLORS.spent;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = px(2);
-    ctx.stroke();
-    ctx.fillStyle = '#fff';
-    ctx.font = '700 ' + px(13) + 'px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(charged ? '1' : '0', x, y + px(1));
-  }
-
-  // A small label next to a part: above it, or below when it sits near the top of the board
-  function drawCallout(body, text, alpha) {
-    ctx.save();
-    ctx.globalAlpha = alpha == null ? 1 : alpha;
-    ctx.font = '600 ' + px(13) + 'px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    var tw = ctx.measureText(text).width + px(16), th = px(24);
-    var below = body.bounds.min.y - px(40) < 0;
-    var x = Math.min(Math.max(body.position.x, tw / 2 + px(4)), W - tw / 2 - px(4));
-    var y = below ? body.bounds.max.y + px(22) : body.bounds.min.y - px(22);
-    ctx.fillStyle = COLORS.charge;
-    ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(x - tw / 2, y - th / 2, tw, th, px(8));
-    else ctx.rect(x - tw / 2, y - th / 2, tw, th);
-    ctx.fill();
-    ctx.fillStyle = '#fff';
-    ctx.fillText(text, x, y + px(1));
-    ctx.restore();
-  }
-
-  // Tray parts are purple with grip dots, and turn green once something hits them during a run
-  function drawMovable(body) {
-    if (body.plugin.part.type === 'spring') {
-      var color = game.touched[body.plugin.part.id] ? COLORS.touched
-        : editor.isInvalid(body) ? COLORS.invalid : COLORS.movable;
-      drawSpring(body, color);
-      if (editor.isSelected(body)) {
-        tracePath(body);
-        ctx.strokeStyle = COLORS.handle;
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-      }
-      return;
-    }
-    var bad = editor.isInvalid(body);
-    var hit = game.touched[body.plugin.part.id];
-    if (hit) {
-      ctx.save();
-      ctx.shadowColor = COLORS.touched;
-      ctx.shadowBlur = 14;
-      drawBody(body, COLORS.touched);
-      ctx.restore();
-    } else {
-      drawBody(body, bad ? COLORS.invalid : COLORS.movable);
-    }
-    if (editor.isSelected(body)) {
-      tracePath(body);
-      ctx.strokeStyle = COLORS.selected;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
-    if (mode !== 'edit') return;
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    var c = Math.cos(body.angle), s = Math.sin(body.angle);
-    for (var i = -1; i <= 1; i++) {
-      ctx.beginPath();
-      ctx.arc(body.position.x + c * i * 10, body.position.y + s * i * 10, 2.2, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  function draw() {
-    ctx.fillStyle = COLORS.sky;
-    ctx.fillRect(0, 0, W, H);
-
-    var g = game.goal;
-    if (g) {
-      ctx.fillStyle = COLORS.goal;
-      ctx.fillRect(g.x0, g.y0, g.x1 - g.x0, g.y1 - g.y0);
-    }
-
-    var dominoIndex = 0;
-    Matter.Composite.allBodies(game.engine.world).forEach(function (b) {
-      var kind = b.render.kind;
-      if (kind === 'bound') return;
-      if (b.plugin.part && b.plugin.part.tray) {
-        drawMovable(b);
-      } else if (kind === 'ball') {
-        ctx.beginPath();
-        ctx.arc(b.position.x, b.position.y, b.circleRadius, 0, Math.PI * 2);
-        ctx.fillStyle = COLORS.ball;
-        ctx.fill();
-        // A highlight line so rolling is visible
-        ctx.strokeStyle = 'rgba(255,255,255,0.7)';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(b.position.x, b.position.y);
-        ctx.lineTo(b.position.x + Math.cos(b.angle) * b.circleRadius * 0.8,
-                   b.position.y + Math.sin(b.angle) * b.circleRadius * 0.8);
-        ctx.stroke();
-      } else if (kind === 'domino') {
-        drawBody(b, COLORS.domino[dominoIndex++ % COLORS.domino.length]);
-      } else if (kind === 'basket') {
-        drawBody(b, COLORS.basket);
-      } else {
-        drawBody(b, COLORS.wall);
-      }
-    });
-    editor.drawOverlay(ctx, COLORS);
-  }
-
-  // Fixed-step physics keeps the simulation identical on every device
   function frame(now) {
     if (lastTime == null) lastTime = now;
     var dt = Math.min(now - lastTime, 100);
     lastTime = now;
-    if (mode === 'run') {
-      accumulator += dt;
-      while (mode === 'run' && accumulator >= ChainWorld.STEP_MS) {
-        Matter.Engine.update(game.engine, ChainWorld.STEP_MS);
-        accumulator -= ChainWorld.STEP_MS;
-        var outcome = ChainWorld.checkOutcome(Matter, game);
-        if (outcome) finish(outcome);
-      }
-      if (mode === 'run') updateRunUi();
+    if (view === 'tower') {
+      tower.update(now);
+      if (view === 'tower') tower.draw(ctx, progress.currentIndex(levels));
     }
-    draw();
+    if (view === 'floor') {
+      if (mode === 'run') {
+        accumulator += dt;
+        while (mode === 'run' && accumulator >= ChainWorld.STEP_MS) {
+          Matter.Engine.update(game.engine, ChainWorld.STEP_MS);
+          accumulator -= ChainWorld.STEP_MS;
+          var outcome = ChainWorld.checkOutcome(Matter, game);
+          if (outcome) finish(outcome);
+        }
+        if (mode === 'run') updateRunUi();
+      }
+      var dpr = window.devicePixelRatio || 1;
+      ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+      ChainRender.drawFloor(ctx, game, { scale: scale, mode: mode, editor: mode === 'edit' ? editor : null });
+    }
     requestAnimationFrame(frame);
   }
 
   btnPlay.addEventListener('click', play);
-  canvas.addEventListener('pointerdown', onRunTap);
   btnReset.addEventListener('click', onResetClick);
-  document.getElementById('btn-again').addEventListener('click', playAgain);
-  window.addEventListener('resize', resize);
+  btnTower.addEventListener('click', function () { if (view === 'floor') showTower(false); });
+  btnNext.addEventListener('click', goToNextFloor);
+  btnAgain.addEventListener('click', playAgain);
+  canvas.addEventListener('pointerdown', onRunTap);
+  canvas.addEventListener('pointerdown', onTowerDown);
+  window.addEventListener('pointermove', onTowerMove);
+  window.addEventListener('pointerup', onTowerUp);
+  window.addEventListener('pointercancel', function () { towerPointer = null; });
+  window.addEventListener('resize', function () { if (view) resize(); });
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { if (tower) tower.resetColors(); });
+  }
 
-  edit();
-  resize();
-  requestAnimationFrame(frame);
+  ChainLevels.load().then(function (loaded) {
+    levels = loaded;
+    progress = ChainProgress.create();
+    tower = ChainTower.create({ levels: levels, progress: progress, getSize: stageSize });
+    showTower(true);
+    requestAnimationFrame(frame);
+  }).catch(function (err) {
+    statusEl.textContent = 'לא הצלחתי לטעון את הקומות (' + err.message + '). פתחו את המשחק דרך שרת, למשל npx serve';
+  });
 })();

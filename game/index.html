@@ -6,9 +6,10 @@
   <title>תגובת שרשרת</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="in-tower">
   <header class="bar">
     <h1 id="level-name">תגובת שרשרת</h1>
+    <button id="btn-tower" class="btn small" hidden>↑ מגדל</button>
   </header>
   <main id="stage">
     <canvas id="canvas"></canvas>
@@ -17,7 +18,10 @@
         <p class="win-title">הצלחת!</p>
         <p id="win-stars" class="win-stars" aria-label="כוכבים"></p>
         <p id="win-text" class="win-text"></p>
-        <button id="btn-again" class="btn primary">↺ שחקו שוב</button>
+        <div class="win-actions">
+          <button id="btn-next" class="btn primary">▼ לקומה הבאה</button>
+          <button id="btn-again" class="btn">↺ שחקו שוב</button>
+        </div>
       </div>
     </div>
   </main>
@@ -33,7 +37,10 @@
   <script src="vendor/matter.min.js"></script>
   <script src="js/world.js"></script>
   <script src="js/editor.js"></script>
-  <script src="js/level1.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/levels.js"></script>
+  <script src="js/progress.js"></script>
+  <script src="js/tower.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>
