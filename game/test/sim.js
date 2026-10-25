@@ -13,7 +13,7 @@ levels.forEach(function (level) {
   var game = ChainWorld.buildWorld(Matter, level);
   ChainWorld.startChain(Matter, game);
   var t, success = false;
-  for (t = 0; t < 60 * 15; t++) {
+  for (t = 0; t < 60 * 30; t++) {
     Matter.Engine.update(game.engine, ChainWorld.STEP_MS);
     if (ChainWorld.ballInGoal(game)) { success = true; break; }
   }

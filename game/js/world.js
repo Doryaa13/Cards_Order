@@ -6,7 +6,7 @@
   function buildWorld(Matter, level) {
     var Bodies = Matter.Bodies, Composite = Matter.Composite;
     var engine = Matter.Engine.create({ positionIterations: 12, velocityIterations: 10 });
-    engine.gravity.y = 1;
+    engine.gravity.y = 1; engine.gravity.scale = 0.0018;
     var W = level.world.width, H = level.world.height;
     var byId = {};
     var goal = null;

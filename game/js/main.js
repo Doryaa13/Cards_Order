@@ -35,7 +35,7 @@
   // Fit the canvas to the stage while keeping the world's aspect ratio
   function resize() {
     var stage = canvas.parentElement;
-    var maxW = stage.clientWidth - 32, maxH = stage.clientHeight - 8;
+    var maxW = stage.clientWidth, maxH = stage.clientHeight;
     scale = Math.min(maxW / W, maxH / H);
     var dpr = window.devicePixelRatio || 1;
     canvas.style.width = Math.floor(W * scale) + 'px';

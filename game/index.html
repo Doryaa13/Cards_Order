@@ -9,15 +9,17 @@
 <body>
   <header class="bar">
     <h1 id="level-name">תגובת שרשרת</h1>
-    <div class="controls">
-      <button id="btn-play" class="btn primary">▶ הפעל</button>
-      <button id="btn-reset" class="btn">↺ אפס</button>
-    </div>
   </header>
   <main id="stage">
     <canvas id="canvas"></canvas>
   </main>
-  <p id="status" class="status">לחצו "הפעל" כדי להפיל את הדומינו הראשון</p>
+  <footer class="dock">
+    <p id="status" class="status">לחצו "הפעל" כדי להפיל את הדומינו הראשון</p>
+    <div class="controls">
+      <button id="btn-play" class="btn primary">▶ הפעל</button>
+      <button id="btn-reset" class="btn">↺ אפס</button>
+    </div>
+  </footer>
 
   <script src="vendor/matter.min.js"></script>
   <script src="js/world.js"></script>
