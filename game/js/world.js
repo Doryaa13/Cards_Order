@@ -104,11 +104,28 @@
     return { touched: touched, total: total, needed: Math.ceil(total / 2), stars: stars };
   }
 
+  // Starts a run: either knocks over the first domino (push) or shoots the ball out of the
+  // entry pipe at the top of the floor (launch), as the level says.
   function startChain(Matter, game) {
-    var push = game.level.push;
-    var target = game.byId[push.target];
+    var level = game.level;
     game.started = true;
-    if (target) Matter.Body.setAngularVelocity(target, push.angularVelocity);
+    if (level.push) {
+      var target = game.byId[level.push.target];
+      if (target) Matter.Body.setAngularVelocity(target, level.push.angularVelocity);
+    }
+    if (level.launch) {
+      Matter.Body.setVelocity(game.byId.ball, { x: level.launch.vx, y: level.launch.vy });
+    }
+  }
+
+  var ALLOWED_DEPTH = 1.5;     // parts may touch, but not overlap
+
+  // True when a placed part is fully on the board and does not overlap anything else
+  function placementOk(Matter, game, body) {
+    var b = body.bounds;
+    if (b.min.x < 0 || b.min.y < 0 || b.max.x > game.width || b.max.y > game.height) return false;
+    var others = Matter.Composite.allBodies(game.engine.world).filter(function (o) { return o !== body; });
+    return !Matter.Query.collides(body, others).some(function (c) { return c.depth > ALLOWED_DEPTH; });
   }
 
   // Fires a spring: everything resting on (or just above) its pad is launched the way the pad faces.
@@ -182,7 +199,7 @@
 
   var api = {
     buildWorld: buildWorld, makeTrayBody: makeTrayBody, startChain: startChain, ballInGoal: ballInGoal,
-    fireSpring: fireSpring, tapAvailable: tapAvailable,
+    fireSpring: fireSpring, tapAvailable: tapAvailable, placementOk: placementOk,
     checkOutcome: checkOutcome, score: score, STEP_MS: 1000 / 60
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

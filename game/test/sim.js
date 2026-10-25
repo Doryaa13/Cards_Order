@@ -6,12 +6,21 @@ var path = require('path');
 var Matter = require(path.join(__dirname, '../vendor/matter.min.js'));
 var ChainWorld = require(path.join(__dirname, '../js/world.js'));
 
-global.window = {};
-require(path.join(__dirname, '../js/level1.js'));
-var levels = global.window.LEVELS;
+var fs = require('fs');
+var levelDir = path.join(__dirname, '../levels');
+var levels = JSON.parse(fs.readFileSync(path.join(levelDir, 'index.json'), 'utf8')).map(function (f) {
+  return JSON.parse(fs.readFileSync(path.join(levelDir, f), 'utf8'));
+});
 
 function run(level, placements, tap) {
   var game = ChainWorld.buildWorld(Matter, level, placements);
+  // A stored solution must be something a player can actually build in the editor
+  var blocked = Matter.Composite.allBodies(game.engine.world).filter(function (b) {
+    return b.plugin.part && b.plugin.part.tray && !ChainWorld.placementOk(Matter, game, b);
+  });
+  if (blocked.length) {
+    return { outcome: 'not placeable (' + blocked.map(function (b) { return b.plugin.part.id; }).join(', ') + ')', seconds: '-', ball: '-' };
+  }
   ChainWorld.startChain(Matter, game);
   var t, outcome = null;
   for (t = 0; !outcome; t++) {

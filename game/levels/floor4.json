@@ -1,0 +1,24 @@
+{
+  "id": "floor4",
+  "name": "קומה 4: מבוך המדפים",
+  "notes": "The ball drops in on the right. Three fixed shelves stagger down the floor, each tipping the ball back to the right wall. Four ramps in the tray, so two stars are possible here: three stars means zigzagging the ball across all four.",
+  "world": {"width": 600, "height": 1000},
+  "launch": {"vx": -1, "vy": 0},
+  "tray": [
+    {"id": "a", "type": "wall", "w": 200, "h": 16},
+    {"id": "b", "type": "wall", "w": 200, "h": 16},
+    {"id": "c", "type": "wall", "w": 160, "h": 16},
+    {"id": "d", "type": "wall", "w": 160, "h": 16}
+  ],
+  "solutions": [
+    {"stars": 3, "placements": {"a": {"x": 482, "y": 390, "angle": 170}, "b": {"x": 370, "y": 540, "angle": 20}, "c": {"x": 520, "y": 780, "angle": 160}, "d": {"x": 340, "y": 870, "angle": 165}}},
+    {"stars": 1, "placements": {"a": {"x": 309, "y": 491, "angle": -5}, "b": {"x": 186, "y": 272, "angle": 25}, "c": {"x": 520, "y": 780, "angle": 160}, "d": {"x": 340, "y": 870, "angle": 165}}}
+  ],
+  "parts": [
+    {"type": "ball", "id": "ball", "x": 510, "y": 40, "r": 16},
+    {"type": "wall", "x": 420, "y": 260, "w": 220, "h": 16, "angle": 8},
+    {"type": "wall", "x": 180, "y": 470, "w": 240, "h": 16, "angle": -8},
+    {"type": "wall", "x": 420, "y": 680, "w": 220, "h": 16, "angle": 8},
+    {"type": "basket", "x": 120, "y": 990, "w": 240, "h": 90}
+  ]
+}

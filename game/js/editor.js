@@ -9,7 +9,6 @@
   var HANDLE_R_PX = 17;        // drawn radius of the move and rotate handles
   var HANDLE_HIT_PX = 28;      // how far from a handle's center a finger still grabs it
   var HANDLE_GAP_PX = 14;      // space between the part and its handles
-  var ALLOWED_DEPTH = 1.5;     // touching is fine, real overlap is not
   var TOUCH_LIFT_PX = 56;      // a part pulled from the tray by finger floats above it so it stays visible
 
   function create(opts) {
@@ -70,12 +69,7 @@
       };
     }
 
-    function placementOk(body) {
-      var b = body.bounds;
-      if (b.min.x < 0 || b.min.y < 0 || b.max.x > game.width || b.max.y > game.height) return false;
-      var others = Matter.Composite.allBodies(game.engine.world).filter(function (o) { return o !== body; });
-      return !Matter.Query.collides(body, others).some(function (c) { return c.depth > ALLOWED_DEPTH; });
-    }
+    function placementOk(body) { return ChainWorld.placementOk(Matter, game, body); }
 
     // Shift a part that pokes past an edge back onto the board, so it slides along the edge
     function keepOnBoard(body) {

@@ -1,0 +1,21 @@
+{
+  "id": "floor3",
+  "name": "קומה 3: החומה",
+  "notes": "The ball drops in from the pipe on the left. A tall fixed wall splits the bottom of the floor, with the basket on the far side. Ramps can carry the ball over the wall for one star; three stars also needs the spring.",
+  "world": {"width": 600, "height": 1000},
+  "launch": {"vx": 1.5, "vy": 0},
+  "tray": [
+    {"id": "a", "type": "wall", "w": 240, "h": 16},
+    {"id": "b", "type": "wall", "w": 200, "h": 16},
+    {"id": "s", "type": "spring"}
+  ],
+  "solutions": [
+    {"stars": 3, "tap": {"part": "s", "step": 150}, "placements": {"a": {"x": 230, "y": 360, "angle": 160}, "b": {"x": 470, "y": 650, "angle": 20}, "s": {"x": 73, "y": 387, "angle": 35}}},
+    {"stars": 1, "placements": {"a": {"x": 200, "y": 330, "angle": 20}, "b": {"x": 440, "y": 560, "angle": 25}, "s": {"x": 80, "y": 950, "angle": 0}}}
+  ],
+  "parts": [
+    {"type": "ball", "id": "ball", "x": 90, "y": 40, "r": 16},
+    {"type": "wall", "x": 300, "y": 760, "w": 24, "h": 480},
+    {"type": "basket", "x": 510, "y": 990, "w": 180, "h": 90}
+  ]
+}

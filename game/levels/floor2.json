@@ -1,0 +1,22 @@
+{
+  "id": "floor2",
+  "name": "קומה 2: מסביב לבלוק",
+  "notes": "The ball drops in from the pipe on the right. A fixed block fills the middle of the floor and the basket sits at the bottom left, under it. With nothing placed the ball falls straight down the right side and misses.",
+  "world": {"width": 600, "height": 1000},
+  "launch": {"vx": -1.5, "vy": 0},
+  "tray": [
+    {"id": "a", "type": "wall", "w": 260, "h": 16},
+    {"id": "b", "type": "wall", "w": 220, "h": 16},
+    {"id": "c", "type": "wall", "w": 180, "h": 16}
+  ],
+  "solutions": [
+    {"stars": 3, "placements": {"a": {"x": 430, "y": 330, "angle": 20}, "b": {"x": 485, "y": 700, "angle": 160}, "c": {"x": 220, "y": 820, "angle": 160}}},
+    {"stars": 1, "placements": {"a": {"x": 150, "y": 100, "angle": 0}, "b": {"x": 450, "y": 700, "angle": 160}, "c": {"x": 220, "y": 820, "angle": 160}}}
+  ],
+  "parts": [
+    {"type": "ball", "id": "ball", "x": 510, "y": 40, "r": 16},
+    {"type": "wall", "x": 300, "y": 520, "w": 240, "h": 120},
+    {"type": "wall", "x": 120, "y": 300, "w": 200, "h": 16, "angle": -12},
+    {"type": "basket", "x": 90, "y": 990, "w": 180, "h": 90}
+  ]
+}

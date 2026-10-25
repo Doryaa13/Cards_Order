@@ -1,0 +1,31 @@
+{
+  "id": "floor1",
+  "name": "קומה 1: הדומינו הראשון",
+  "notes": "A row of dominoes knocks the ball off a shelf and down to the right wall. Ramps alone reach the basket for one star; for three, ramp b rolls the ball into a V with the spring by the left wall and a tap throws it over to the basket. With nothing placed the ball drops straight into the basket but touches no tray part, which does not count.",
+  "world": {"width": 600, "height": 1000},
+  "push": {"target": "d1", "angularVelocity": 0.12},
+  "tray": [
+    {"id": "a", "type": "wall", "w": 280, "h": 16},
+    {"id": "b", "type": "wall", "w": 240, "h": 16},
+    {"id": "s", "type": "spring"}
+  ],
+  "solutions": [
+    {"stars": 3, "tap": {"part": "s", "step": 450}, "placements": {"a": {"x": 455, "y": 470, "angle": 160}, "b": {"x": 206, "y": 715, "angle": 160}, "s": {"x": 50, "y": 742, "angle": 35}}},
+    {"stars": 1, "placements": {"a": {"x": 455, "y": 470, "angle": 160}, "b": {"x": 330, "y": 740, "angle": 20}, "s": {"x": 60, "y": 60, "angle": 0}}}
+  ],
+  "parts": [
+    {"type": "wall", "x": 230, "y": 210, "w": 380, "h": 20},
+    {"type": "domino", "id": "d1", "x": 70, "y": 168},
+    {"type": "domino", "x": 106, "y": 168},
+    {"type": "domino", "x": 142, "y": 168},
+    {"type": "domino", "x": 178, "y": 168},
+    {"type": "domino", "x": 214, "y": 168},
+    {"type": "domino", "x": 250, "y": 168},
+    {"type": "domino", "x": 286, "y": 168},
+    {"type": "domino", "x": 322, "y": 168},
+    {"type": "domino", "x": 358, "y": 168},
+    {"type": "ball", "id": "ball", "x": 406, "y": 184, "r": 16},
+    {"type": "wall", "x": 455, "y": 325, "w": 177, "h": 16, "angle": 16.4},
+    {"type": "basket", "x": 510, "y": 990, "w": 180, "h": 90}
+  ]
+}
