@@ -1,5 +1,6 @@
 // Level 1: a row of dominoes knocks a ball off a shelf and down a ramp to the right wall.
-// The player places the three tray ramps so the ball zigzags down, touching them, into the basket.
+// The player places two ramps and a spring from the tray. Ramps alone can reach the basket for
+// one star; touching all three means resting the ball on the spring and tapping it.
 // World units: 600 x 1000 (portrait), y grows downward. Angles are in degrees.
 window.LEVELS = window.LEVELS || [];
 window.LEVELS.push({
@@ -9,20 +10,23 @@ window.LEVELS.push({
   // Parts the player drags from the tray onto the board
   tray: [
     { id: 'a', type: 'wall', w: 280, h: 16 },
-    { id: 'b', type: 'wall', w: 300, h: 16 },
-    { id: 'c', type: 'wall', w: 360, h: 16 }
+    { id: 'b', type: 'wall', w: 240, h: 16 },
+    { id: 's', type: 'spring' }
   ],
-  // Known placements and the stars they earn; used by the headless test
+  // Known placements and the stars they earn; used by the headless test.
+  // tap: { part, step } fires that spring at that physics step of the run.
   solutions: [
-    { stars: 3, placements: {
-      a: { x: 470, y: 470, angle: 160 },
-      b: { x: 150, y: 640, angle: 20 },
-      c: { x: 385, y: 775, angle: 160 } } },
-    // The ball skips the first ramp: basket reached with two of three parts touched
+    // Ramp b rolls the ball down into a V with the spring by the left wall. Tapping while it rests
+    // there throws it up over ramp b and across to the basket.
+    { stars: 3, tap: { part: 's', step: 450 }, placements: {
+      a: { x: 455, y: 470, angle: 160 },
+      b: { x: 206, y: 715, angle: 160 },
+      s: { x: 55, y: 738, angle: 35 } } },
+    // Ramps only, spring parked out of the way: basket reached with two of three parts touched
     { stars: 1, placements: {
-      a: { x: 510, y: 470, angle: 170 },
-      b: { x: 150, y: 640, angle: 20 },
-      c: { x: 385, y: 775, angle: 160 } } }
+      a: { x: 455, y: 470, angle: 160 },
+      b: { x: 330, y: 740, angle: 20 },
+      s: { x: 40, y: 60, angle: 0 } } }
   ],
   parts: [
     // Shelf the dominoes stand on
@@ -41,7 +45,8 @@ window.LEVELS.push({
     { type: 'ball', id: 'ball', x: 406, y: 184, r: 16 },
     // Fixed ramp under the shelf: sends the ball to the right wall
     { type: 'wall', x: 455, y: 325, w: 177, h: 16, angle: 16.4 },
-    // Goal basket against the left wall (x, y = bottom-center of the basket)
-    { type: 'basket', x: 90, y: 990, w: 180, h: 90 }
+    // Goal basket in the bottom-right corner (x, y = bottom-center of the basket).
+    // With nothing placed the ball drops straight in, but touching no tray parts does not count.
+    { type: 'basket', x: 510, y: 990, w: 180, h: 90 }
   ]
 });

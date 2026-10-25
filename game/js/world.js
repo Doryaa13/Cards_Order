@@ -5,10 +5,17 @@
 
   var TOUCH_MIN_SPEED = 0.2;   // a resting piece leaning on a tray part does not count as touching it
 
-  // A part from the tray, placed on the board by the player
+  var SPRING_W = 70, SPRING_H = 24;
+  var SPRING_KICK = 16;        // speed added along the spring's facing direction when it fires
+  var SPRING_REACH = 40;       // how far above its pad the spring still catches things
+
+  // A part from the tray, placed on the board by the player.
+  // Springs fire once when the player taps them during a run.
   function makeTrayBody(Matter, item, x, y, angleDeg) {
+    var spring = item.type === 'spring';
+    if (spring) item = Object.assign({ w: SPRING_W, h: SPRING_H, tappable: true }, item);
     var body = Matter.Bodies.rectangle(x, y, item.w, item.h, {
-      isStatic: true, angle: (angleDeg || 0) * deg, friction: 0.6
+      isStatic: true, angle: (angleDeg || 0) * deg, friction: spring ? 0.9 : 0.6
     });
     body.render.kind = item.type;
     body.plugin.part = Object.assign({ tray: true }, item);
@@ -104,6 +111,33 @@
     if (target) Matter.Body.setAngularVelocity(target, push.angularVelocity);
   }
 
+  // Fires a spring: everything resting on (or just above) its pad is launched the way the pad faces.
+  // Only one tap per run.
+  function fireSpring(Matter, game, spring) {
+    if (game.tapUsed) return false;
+    game.tapUsed = true;
+    spring.plugin.firedAt = game.steps || 0;
+    var a = spring.angle, part = spring.plugin.part;
+    var up = { x: Math.sin(a), y: -Math.cos(a) }, along = { x: Math.cos(a), y: Math.sin(a) };
+    Matter.Composite.allBodies(game.engine.world).forEach(function (b) {
+      if (b.isStatic) return;
+      var dx = b.position.x - spring.position.x, dy = b.position.y - spring.position.y;
+      var u = dx * along.x + dy * along.y, h = dx * up.x + dy * up.y;
+      var r = b.circleRadius || 10;
+      if (Math.abs(u) < part.w / 2 + r && h > 0 && h < part.h / 2 + r + SPRING_REACH) {
+        Matter.Body.setVelocity(b, { x: b.velocity.x + up.x * SPRING_KICK, y: b.velocity.y + up.y * SPRING_KICK });
+      }
+    });
+    return true;
+  }
+
+  // True while the player can still change the run with a tap
+  function tapAvailable(Matter, game) {
+    return !game.tapUsed && Matter.Composite.allBodies(game.engine.world).some(function (b) {
+      return b.plugin.part && b.plugin.part.tappable;
+    });
+  }
+
   function ballInGoal(game) {
     var ball = game.byId.ball, g = game.goal;
     if (!ball || !g) return false;
@@ -115,6 +149,7 @@
   // Win: the ball stays inside the basket for half a second.
   // Fail: the ball has left its start and then stays put outside the basket for two seconds,
   // or nothing at all moves for two seconds (the chain broke), or the run passes 40 seconds.
+  // While a tap is still available the game waits longer, since the player may be about to use it.
   function checkOutcome(Matter, game) {
     var ball = game.byId.ball, p = ball.position;
     game.steps = (game.steps || 0) + 1;
@@ -140,12 +175,14 @@
       game.bodiesLast = bodies.map(function (b) { return { x: b.position.x, y: b.position.y }; });
       game.frozenSeconds = anyMoved ? 0 : (game.frozenSeconds || 0) + 1;
     }
-    if (game.stillSeconds >= 2 || game.frozenSeconds >= 2 || game.steps >= 60 * 40) return 'fail';
+    var patience = tapAvailable(Matter, game) ? 6 : 2;
+    if (game.stillSeconds >= patience || game.frozenSeconds >= patience || game.steps >= 60 * 40) return 'fail';
     return null;
   }
 
   var api = {
     buildWorld: buildWorld, makeTrayBody: makeTrayBody, startChain: startChain, ballInGoal: ballInGoal,
+    fireSpring: fireSpring, tapAvailable: tapAvailable,
     checkOutcome: checkOutcome, score: score, STEP_MS: 1000 / 60
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

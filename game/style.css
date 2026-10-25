@@ -142,6 +142,7 @@ body {
   cursor: grab;
   touch-action: none;
 }
+.tray-spring { width: 34px; height: 22px; fill: var(--part); stroke: var(--part); }
 .tray-bar { display: block; height: 8px; border-radius: 2px; background: var(--part); }
 .tray-empty { color: var(--muted); font-size: 0.9rem; }
 .win-stars { font-size: 2.2rem; letter-spacing: 4px; color: var(--star); line-height: 1; }

@@ -66,12 +66,22 @@
       return !Matter.Query.collides(body, others).some(function (c) { return c.depth > ALLOWED_DEPTH; });
     }
 
-    // Apply a move or rotation, keeping the last valid transform to fall back to on release
-    function apply(body, pos, angle) {
+    // Shift a part that pokes past an edge back onto the board, so it slides along the edge
+    function keepOnBoard(body) {
+      var b = body.bounds;
+      var dx = Math.max(0, -b.min.x) - Math.max(0, b.max.x - game.width);
+      var dy = Math.max(0, -b.min.y) - Math.max(0, b.max.y - game.height);
+      if (dx || dy) Matter.Body.setPosition(body, { x: body.position.x + dx, y: body.position.y + dy });
+    }
+
+    // Apply a move or rotation, keeping the last valid transform to fall back to on release.
+    // While the pointer is over the board the part is kept inside it; over the tray it may hang outside.
+    function apply(body, pos, angle, onBoard) {
       Matter.Body.setPosition(body, pos);
       Matter.Body.setAngle(body, angle);
+      if (onBoard) keepOnBoard(body);
       invalid = !placementOk(body);
-      if (!invalid) drag.lastValid = { x: pos.x, y: pos.y, angle: angle };
+      if (!invalid) drag.lastValid = { x: body.position.x, y: body.position.y, angle: angle };
     }
 
     function onDown(e) {
@@ -79,18 +89,24 @@
       var p = toWorld(e);
       var slop = TOUCH_SLOP_PX / opts.getScale();
 
+      // Closest part to the pointer, within finger reach
+      var hit = null, best = slop;
+      movableBodies().forEach(function (b) {
+        var d = distToBody(b, p);
+        if (d <= best) { best = d; hit = b; }
+      });
+
+      // The selected part's rotate handle wins, unless the pointer is squarely on another part
+      // and not on the handle circle itself (the handle can sit over a neighbouring part)
       if (selected) {
         var h = handleFor(selected);
-        if (Math.hypot(p.x - h.x, p.y - h.y) < HANDLE_R + slop) {
+        var dh = Math.hypot(p.x - h.x, p.y - h.y);
+        var onOtherPart = hit && hit !== selected && best === 0;
+        if (dh < HANDLE_R || (dh < HANDLE_R + slop && !onOtherPart)) {
           drag = { body: selected, mode: 'rotate', offset: h.offset };
         }
       }
       if (!drag) {
-        var hit = null, best = slop;
-        movableBodies().forEach(function (b) {
-          var d = distToBody(b, p);
-          if (d <= best) { best = d; hit = b; }
-        });
         selected = hit;
         if (hit) drag = { body: hit, mode: 'move', dx: hit.position.x - p.x, dy: hit.position.y - p.y };
       }
@@ -110,7 +126,7 @@
       Matter.Composite.add(game.engine.world, body);
       selected = body;
       drag = { body: body, mode: 'move', dx: 0, dy: -lift, fromTray: true, lastValid: null };
-      apply(body, body.position, 0);
+      apply(body, body.position, 0, false);
       e.preventDefault();
       opts.onChange();
     }
@@ -120,10 +136,10 @@
       overTray = opts.isOverTray(e);
       var p = toWorld(e), body = drag.body;
       if (drag.mode === 'move') {
-        apply(body, { x: p.x + drag.dx, y: p.y + drag.dy }, body.angle);
+        apply(body, { x: p.x + drag.dx, y: p.y + drag.dy }, body.angle, !overTray);
       } else {
         var a = Math.atan2(p.y - body.position.y, p.x - body.position.x) - drag.offset;
-        apply(body, body.position, Math.round(a / ROTATE_SNAP) * ROTATE_SNAP);
+        apply(body, body.position, Math.round(a / ROTATE_SNAP) * ROTATE_SNAP, true);
       }
       opts.onChange();
     }
