@@ -177,19 +177,26 @@ body {
 .tray-bar { display: block; height: 8px; border-radius: 2px; background: var(--part); }
 .tray-empty { color: var(--muted); font-size: 0.9rem; }
 .win-stars { font-size: 2.2rem; letter-spacing: 4px; color: var(--star); line-height: 1; }
-.towers {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 16px;
-  overflow-y: auto;
-  background: var(--bg);
+/* The main menu sits over the tower canvas; only the arrows take touches, the rest goes to the canvas */
+.home { position: absolute; inset: 0; pointer-events: none; }
+.home[hidden] { display: none; }
+.home-world {
+  position: absolute; top: 6px; inset-inline: 0;
+  text-align: center; font-size: 0.85rem; font-weight: 700; color: var(--muted);
 }
-.towers[hidden] { display: none; }
-.towers-world { font-weight: 700; color: var(--muted); margin-top: 6px; }
-.tower-choice { display: flex; justify-content: space-between; align-items: center; }
-.tower-choice.current { border-color: var(--accent); border-width: 2px; }
-.tower-stars { color: var(--star); font-variant-numeric: tabular-nums; }
-.tower-choice:disabled .tower-stars { color: var(--muted); }
+.home-dots { position: absolute; bottom: 8px; inset-inline: 0; display: flex; justify-content: center; gap: 7px; }
+.home-dots .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
+.home-dots .dot.on { background: var(--accent); }
+.home-dots .dot.lab { border-radius: 2px; }
+.home-arrow {
+  pointer-events: auto;
+  position: absolute; top: 0; bottom: 0; width: 64px;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; background: none; color: var(--accent);
+  font-size: 3.4rem; font-weight: 300; line-height: 1; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.home-arrow[hidden] { display: none; }
+.home-arrow.prev { right: 0; }
+.home-arrow.next { left: 0; }
+.home-arrow:active { opacity: 0.5; }

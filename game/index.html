@@ -10,7 +10,7 @@
   <header class="bar">
     <h1 id="level-name">תגובת שרשרת</h1>
     <button id="btn-tower" class="btn small" hidden>↑ מגדל</button>
-    <button id="btn-switch" class="btn small" hidden>המעבדה</button>
+    <button id="btn-switch" class="btn small" hidden>‹ מגדלים</button>
   </header>
   <main id="stage">
     <canvas id="canvas"></canvas>
@@ -25,7 +25,12 @@
         </div>
       </div>
     </div>
-    <div id="towers" class="towers" hidden></div>
+    <div id="home" class="home" hidden>
+      <p id="home-world" class="home-world"></p>
+      <div id="home-dots" class="home-dots" aria-hidden="true"></div>
+      <button id="home-prev" class="home-arrow prev" aria-label="המגדל הקודם">›</button>
+      <button id="home-next" class="home-arrow next" aria-label="המגדל הבא">‹</button>
+    </div>
   </main>
   <footer class="dock">
     <div id="tray" class="tray" aria-label="מאגר חלקים"></div>

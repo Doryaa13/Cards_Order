@@ -19,7 +19,7 @@
     // Rebuilds the still pictures of all floors from the saved progress
     function build() {
       games = levels.map(function (level, i) {
-        var open = progress.unlocked(tower, i);
+        var open = !opts.locked && progress.unlocked(tower, i);
         return {
           open: open,
           stars: progress.stars(level.id),
@@ -56,9 +56,9 @@
       c.y = lo > hi ? (lo + hi) / 2 : Math.max(lo, Math.min(hi, c.y));
       return c;
     }
-    function towerCamera() {
+    function towerCamera(padPx) {
       var height = levels.length * (H + GAP);
-      return fit(-40, -GAP, W + 80, height, TOWER_PAD_PX);
+      return fit(-40, -GAP, W + 80, height, padPx || TOWER_PAD_PX);
     }
 
     // Moves the camera through the given stops. Zoom eases in log space so it feels even at any scale.
@@ -93,7 +93,7 @@
       if (!css) {
         var st = getComputedStyle(document.documentElement);
         var v = function (name) { return st.getPropertyValue(name).trim(); };
-        css = { bg: v('--bg'), border: v('--border'), accent: v('--accent'), ink: v('--ink'), muted: v('--muted'), star: v('--star') };
+        css = { bg: v('--bg'), panel: v('--panel'), border: v('--border'), accent: v('--accent'), ink: v('--ink'), muted: v('--muted'), star: v('--star') };
       }
       return css;
     }
@@ -123,13 +123,16 @@
     }
 
     // live: { index, game, mode } draws that floor's running game instead of its still picture
-    function draw(ctx, currentIndex, live) {
-      var sz = size(), c = colors();
+    // shift: { dx (screen pixels), keepBackground } to slide the tower sideways in the tower picker
+    function draw(ctx, currentIndex, live, shift) {
+      var sz = size(), c = colors(), dx = shift ? shift.dx : 0;
       ctx.setTransform(sz.dpr, 0, 0, sz.dpr, 0, 0);
-      ctx.fillStyle = c.bg;
-      ctx.fillRect(0, 0, sz.w, sz.h);
+      if (!(shift && shift.keepBackground)) {
+        ctx.fillStyle = c.bg;
+        ctx.fillRect(0, 0, sz.w, sz.h);
+      }
       ctx.setTransform(sz.dpr * cam.s, 0, 0, sz.dpr * cam.s,
-        sz.dpr * (sz.w / 2 - cam.x * cam.s), sz.dpr * (sz.h / 2 - cam.y * cam.s));
+        sz.dpr * (sz.w / 2 + dx - cam.x * cam.s), sz.dpr * (sz.h / 2 - cam.y * cam.s));
 
       for (var i = 0; i < levels.length - 1; i++) drawPipe(ctx, i);
 
@@ -166,6 +169,137 @@
     }
 
     // Which floor a screen point falls on, or -1
+    // ---- The main menu picture: the tower as a building, each floor a window with its name and stars ----
+
+    var OVERVIEW_TOP = 30, OVERVIEW_BOTTOM = 28, ARROW_ROOM = 64;
+
+    function overviewLayout() {
+      var sz = size(), n = levels.length;
+      var roof = 40, base = 10;
+      var rowH = (sz.h - OVERVIEW_TOP - OVERVIEW_BOTTOM - roof - base - 8) / n;
+      var fh = rowH - 6, fw = fh * W / H;
+      var bw = Math.min(sz.w - 2 * ARROW_ROOM, 300), bx = (sz.w - bw) / 2;
+      var y0 = OVERVIEW_TOP + roof;
+      return {
+        n: n, rowH: rowH, fh: fh, fw: fw, bx: bx, bw: bw, roofTop: OVERVIEW_TOP, y0: y0,
+        bodyH: n * rowH + 8,
+        // The window of floor i, on the right of its row (the game reads right to left)
+        win: function (i) { return { x: bx + bw - 10 - fw, y: y0 + 4 + i * rowH + 3, w: fw, h: fh }; }
+      };
+    }
+
+    function drawOverview(ctx, currentIndex, shift) {
+      var sz = size(), c = colors(), L = overviewLayout(), dx = shift ? shift.dx : 0;
+      ctx.setTransform(sz.dpr, 0, 0, sz.dpr, 0, 0);
+      if (!(shift && shift.keepBackground)) {
+        ctx.fillStyle = c.bg;
+        ctx.fillRect(0, 0, sz.w, sz.h);
+      }
+      ctx.save();
+      ctx.translate(dx, 0);
+      var locked = !!opts.locked;
+
+      // Roof, walls and a base
+      ctx.fillStyle = locked ? c.border : c.accent;
+      ctx.beginPath();
+      ctx.moveTo(L.bx - 12, L.y0);
+      ctx.lineTo(sz.w / 2, L.roofTop);
+      ctx.lineTo(L.bx + L.bw + 12, L.y0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = c.panel;
+      ctx.fillRect(L.bx, L.y0, L.bw, L.bodyH);
+      ctx.strokeStyle = c.border;
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(L.bx, L.y0, L.bw, L.bodyH);
+      ctx.fillStyle = c.border;
+      ChainRender.roundRect(ctx, L.bx - 10, L.y0 + L.bodyH, L.bw + 20, 10, 3);
+      ctx.fill();
+
+      games.forEach(function (f, i) {
+        var r = L.win(i), here = !locked && i === currentIndex;
+        // The current floor's row is highlighted
+        if (here) {
+          ctx.save();
+          ctx.globalAlpha = 0.14;
+          ctx.fillStyle = c.accent;
+          ctx.fillRect(L.bx + 3, r.y - 3, L.bw - 6, r.h + 6);
+          ctx.restore();
+        }
+        // The floor itself, shrunk into its window
+        var k = r.h / H;
+        ctx.save();
+        ctx.translate(r.x, r.y);
+        ctx.scale(k, k);
+        ChainRender.roundRect(ctx, 0, 0, W, H, 40);
+        ctx.save();
+        ctx.clip();
+        ChainRender.drawFloor(ctx, f.game, { scale: k, mode: 'static', silhouette: !f.open });
+        ctx.restore();
+        ChainRender.roundRect(ctx, 0, 0, W, H, 40);
+        ctx.strokeStyle = here ? c.accent : c.border;
+        ctx.lineWidth = (here ? 2.5 : 1) / k;
+        ctx.stroke();
+        ctx.restore();
+
+        // Number and name beside the window, stars at the far end of the row
+        var ty = r.y + r.h / 2, size = Math.max(11, Math.min(15, r.h * 0.34));
+        var name = levels[i].name.replace(/^[^:]+: /, '');
+        ctx.textBaseline = 'middle';
+        ctx.direction = 'rtl';
+        ctx.textAlign = 'right';
+        ctx.font = (f.open ? 700 : 500) + ' ' + size + 'px system-ui, sans-serif';
+        ctx.fillStyle = here ? c.accent : f.open ? c.ink : c.muted;
+        var text = (i + 1) + ' · ' + (f.open ? name : 'נעולה');
+        var room = r.x - 10 - (L.bx + 58);
+        while (ctx.measureText(text).width > room && text.length > 4) text = text.slice(0, -2) + '…';
+        ctx.fillText(text, r.x - 10, ty);
+        ctx.textAlign = 'left';
+        ctx.font = size + 'px system-ui, sans-serif';
+        ctx.fillStyle = f.stars ? c.star : c.muted;
+        ctx.fillText(here && !f.stars ? 'אתם כאן' : f.open ? '★★★'.slice(0, f.stars) + '☆☆☆'.slice(0, 3 - f.stars) : '', L.bx + 8, ty);
+      });
+
+      // A locked tower: a lock over the building
+      if (locked) {
+        var cy = L.y0 + L.bodyH / 2;
+        ctx.fillStyle = 'rgba(0,0,0,0.04)';
+        ctx.fillRect(L.bx, L.y0, L.bw, L.bodyH);
+        ctx.fillStyle = c.bg;
+        ctx.beginPath();
+        ctx.arc(sz.w / 2, cy, 34, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = c.border;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.font = '32px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('🔒', sz.w / 2, cy + 2);
+      }
+      ctx.restore();
+    }
+
+    function overviewFloorAt(clientX, clientY, rect) {
+      var L = overviewLayout(), x = clientX - rect.left, y = clientY - rect.top;
+      if (x < L.bx || x > L.bx + L.bw) return -1;
+      var i = Math.floor((y - L.y0 - 4) / L.rowH);
+      return i >= 0 && i < L.n ? i : -1;
+    }
+
+    // A camera that shows floor i exactly where its window is in the main menu, to zoom in from
+    function windowCamera(i) {
+      var sz = size(), r = overviewLayout().win(i), s = r.h / H;
+      return { x: W / 2 - (r.x + r.w / 2 - sz.w / 2) / s, y: top(i) + H / 2 - (r.y + r.h / 2 - sz.h / 2) / s, s: s };
+    }
+
+    // An empty background, for the start of a slide between towers
+    function clear(ctx) {
+      var sz = size();
+      ctx.setTransform(sz.dpr, 0, 0, sz.dpr, 0, 0);
+      ctx.fillStyle = colors().bg;
+      ctx.fillRect(0, 0, sz.w, sz.h);
+    }
+
     function floorAt(clientX, clientY, rect) {
       var sz = size();
       var wx = (clientX - rect.left - sz.w / 2) / cam.s + cam.x;
@@ -179,6 +313,10 @@
     return {
       build: build,
       draw: draw,
+      clear: clear,
+      drawOverview: drawOverview,
+      overviewFloorAt: overviewFloorAt,
+      windowCamera: windowCamera,
       update: update,
       animate: animate,
       skip: skip,

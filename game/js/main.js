@@ -15,7 +15,11 @@
   var winEl = document.getElementById('win');
   var trayEl = document.getElementById('tray');
   var winTitleEl = document.getElementById('win-title');
-  var towersEl = document.getElementById('towers');
+  var homeEl = document.getElementById('home');
+  var homeWorldEl = document.getElementById('home-world');
+  var homeDotsEl = document.getElementById('home-dots');
+  var homePrev = document.getElementById('home-prev');
+  var homeNext = document.getElementById('home-next');
 
   // Tray button pictures for parts that are not plain ramps
   var ICONS = {
@@ -41,7 +45,7 @@
   };
 
   var towers, towerIndex = 0, towerData, levels, progress, tower;
-  // view: 'tower', 'floor' or 'replay' (the finished tower running from top to bottom).
+  // view: 'home' (the tower picker), 'tower', 'floor' or 'replay' (the finished tower running from top to bottom).
   // mode (inside a floor): 'edit', 'run' or 'done'.
   var view = null, mode = null;
   var runTaps = [];      // taps during the current run: [{ part, step }], saved with a win
@@ -68,7 +72,7 @@
 
   function resize() {
     var sz = stageSize();
-    if (view === 'tower' || view === 'replay') {
+    if (view === 'home' || view === 'tower' || view === 'replay') {
       canvas.style.width = sz.w + 'px';
       canvas.style.height = sz.h + 'px';
       canvas.width = Math.floor(sz.w * sz.dpr);
@@ -88,7 +92,9 @@
     towerIndex = i;
     towerData = towers[i];
     levels = towerData.floors;
-    tower = ChainTower.create({ tower: towerData, progress: progress, getSize: stageSize });
+    tower = ChainTower.create({
+      tower: towerData, progress: progress, getSize: stageSize, locked: !progress.towerUnlocked(towers, i)
+    });
   }
 
   function totalStars() {
@@ -103,11 +109,12 @@
     mode = null;
     editor.setEnabled(false);
     document.body.classList.add('in-tower');
+    homeEl.hidden = true;
     winEl.hidden = true;
     titleEl.textContent = towerData.name;
     btnTower.hidden = true;
-    btnSwitch.hidden = towers.length < 2;
-    btnSwitch.textContent = 'מגדלים';
+    btnSwitch.hidden = false;
+    btnSwitch.textContent = '‹ מגדלים';
     btnReset.hidden = true;
     btnPlay.disabled = false;
     btnPlay.textContent = progress.complete(towerData) && !towerData.open
@@ -143,21 +150,32 @@
   // In the tower a drag scrolls and a tap (little movement) picks a floor
   var towerPointer = null;
   function onTowerDown(e) {
-    if (view !== 'tower') return;
+    if (view !== 'tower' && view !== 'home') return;
     if (tower.skip()) return;
     towerPointer = { id: e.pointerId, x: e.clientX, y: e.clientY, lastY: e.clientY, moved: false };
     e.preventDefault();
   }
   function onTowerMove(e) {
-    if (!towerPointer || e.pointerId !== towerPointer.id || view !== 'tower') return;
+    if (!towerPointer || e.pointerId !== towerPointer.id || (view !== 'tower' && view !== 'home')) return;
     if (Math.abs(e.clientY - towerPointer.y) + Math.abs(e.clientX - towerPointer.x) > 8) towerPointer.moved = true;
-    if (towerPointer.moved) tower.pan(e.clientY - towerPointer.lastY);
+    if (towerPointer.moved && view === 'tower') tower.pan(e.clientY - towerPointer.lastY);
     towerPointer.lastY = e.clientY;
   }
   function onTowerUp(e) {
     var p = towerPointer;
     towerPointer = null;
-    if (!p || e.pointerId !== p.id || view !== 'tower' || p.moved) return;
+    if (!p || e.pointerId !== p.id) return;
+    if (view === 'home') {
+      var dx = e.clientX - p.x;
+      // A sideways swipe: dragging the tower left brings in the next one
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(e.clientY - p.y)) homeStep(dx < 0 ? 1 : -1);
+      else if (!p.moved) {
+        var i = tower.overviewFloorAt(e.clientX, e.clientY, canvas.getBoundingClientRect());
+        enterTower(i >= 0 && progress.unlocked(towerData, i) ? i : progress.currentIndex(towerData));
+      }
+      return;
+    }
+    if (view !== 'tower' || p.moved) return;
     onTowerTap(e);
   }
 
@@ -431,43 +449,65 @@
     return -1;
   }
 
-  // ---- Choosing a tower ----
+  // ---- The main menu: one whole tower at a time, arrows (or a swipe) to the next one ----
 
-  function openTowerList() {
-    towersEl.innerHTML = '';
-    var world = null;
-    towers.forEach(function (t, i) {
-      if (t.world && t.world !== world) {
-        world = t.world;
-        var h = document.createElement('p');
-        h.className = 'towers-world';
-        h.textContent = world;
-        towersEl.appendChild(h);
-      }
-      var open = progress.towerUnlocked(towers, i);
-      var stars = t.floors.reduce(function (sum, f) { return sum + progress.stars(f.id); }, 0);
-      var btn = document.createElement('button');
-      btn.className = 'btn tower-choice' + (i === towerIndex ? ' current' : '');
-      btn.disabled = !open;
-      btn.innerHTML = '<span>' + t.name + '</span><span class="tower-stars">' +
-        (open ? '★ ' + stars + '/' + t.floors.length * 3 : 'נעול') + '</span>';
-      btn.addEventListener('click', function () { chooseTower(i); });
-      towersEl.appendChild(btn);
-    });
-    var close = document.createElement('button');
-    close.className = 'btn';
-    close.textContent = 'סגירה';
-    close.addEventListener('click', function () { towersEl.hidden = true; });
-    towersEl.appendChild(close);
-    towersEl.hidden = false;
+  var slide = null;   // { from: the tower sliding out, dir, start } while switching towers
+
+  // dir: 0 to just show it, 1 when it comes in from the left (the next tower; the game reads
+  // right to left), -1 from the right
+  function showHome(i, dir) {
+    var from = view === 'home' && dir ? tower : null, fromIndex = from ? progress.currentIndex(towerData) : -1;
+    useTower(i);
+    towerChrome('החליקו או געו בחצים כדי לעבור בין המגדלים');
+    view = 'home';
+    homeEl.hidden = false;
+    btnSwitch.hidden = true;
+    var open = progress.towerUnlocked(towers, i);
+    var prevOpen = null;
+    for (var j = i - 1; j >= 0; j--) if (!towers[j].open) { prevOpen = towers[j]; break; }
+    homeWorldEl.textContent = towerData.world || '';
+    homeDotsEl.innerHTML = towers.map(function (t, k) {
+      return '<span class="dot' + (k === i ? ' on' : '') + (t.open ? ' lab' : '') + '"></span>';
+    }).join('');
+    homePrev.hidden = i === 0;
+    homeNext.hidden = i === towers.length - 1;
+    btnPlay.disabled = !open;
+    if (!open) {
+      btnPlay.textContent = '🔒 נעול';
+      statusEl.textContent = prevOpen ? 'השיגו כוכב בכל הקומות של ' + prevOpen.name + ' כדי לפתוח' : 'נעול';
+    } else {
+      btnPlay.textContent = progress.complete(towerData) && !towerData.open
+        ? '▶ כניסה למגדל' : '▶ קומה ' + (progress.currentIndex(towerData) + 1);
+    }
+    slide = from ? { from: from, fromIndex: fromIndex, dir: dir, start: performance.now() } : null;
   }
 
-  function chooseTower(i) {
-    towersEl.hidden = true;
-    useTower(i);
-    towerChrome('געו בקומה כדי לשחק בה. גררו כדי לגלול');
-    tower.setCamera(tower.towerCamera());
-    tower.animate([tower.menuCamera(progress.currentIndex(towerData))], 900);
+  // From the main menu into the tower: the camera dives into floor i
+  function enterTower(i) {
+    if (!progress.towerUnlocked(towers, towerIndex)) return;
+    slide = null;
+    towerChrome(' ');
+    tower.setCamera(tower.windowCamera(i));
+    flyToFloor(i);
+  }
+
+  function drawHome(now) {
+    var sz = stageSize();
+    if (slide) {
+      var t = Math.min(1, (now - slide.start) / 380), e = 1 - Math.pow(1 - t, 3);
+      tower.clear(ctx);
+      slide.from.drawOverview(ctx, slide.fromIndex, { dx: slide.dir * sz.w * e, keepBackground: true });
+      tower.drawOverview(ctx, progress.currentIndex(towerData), { dx: -slide.dir * sz.w * (1 - e), keepBackground: true });
+      if (t >= 1) slide = null;
+      return;
+    }
+    tower.drawOverview(ctx, progress.currentIndex(towerData));
+  }
+
+  function homeStep(dir) {
+    var i = towerIndex + dir;
+    if (view !== 'home' || i < 0 || i >= towers.length) return;
+    showHome(i, dir);
   }
 
   // Where to start: the first tower of the main progression that is open and not yet complete
@@ -487,6 +527,7 @@
     if (lastTime == null) lastTime = now;
     var dt = Math.min(now - lastTime, 100);
     lastTime = now;
+    if (view === 'home') drawHome(now);
     if (view === 'tower') {
       tower.update(now);
       if (view === 'tower') tower.draw(ctx, progress.currentIndex(towerData));
@@ -515,19 +556,24 @@
     requestAnimationFrame(frame);
   }
 
-  btnPlay.addEventListener('click', play);
+  btnPlay.addEventListener('click', function () {
+    if (view === 'home') enterTower(progress.currentIndex(towerData));
+    else play();
+  });
+  homeNext.addEventListener('click', function () { homeStep(1); });
+  homePrev.addEventListener('click', function () { homeStep(-1); });
   btnReset.addEventListener('click', function () {
     if (view === 'replay') { if (replay) { replay.running = false; tower.skip(); } endReplay(); return; }
     onResetClick();
   });
   btnTower.addEventListener('click', function () { if (view === 'floor') showTower(false); });
-  btnSwitch.addEventListener('click', function () { if (view === 'tower') openTowerList(); });
+  btnSwitch.addEventListener('click', function () { if (view === 'tower' && !tower.animating()) showHome(towerIndex, 0); });
   btnNext.addEventListener('click', function () {
     if (view === 'tower') {
       // The "tower complete" card: on to the next tower, or watch again
       var next = nextTowerIndex();
       btnEdit.textContent = '✎ המשך לערוך';
-      if (next >= 0) { useTower(next); winEl.hidden = true; showTower(true); }
+      if (next >= 0) { winEl.hidden = true; view = 'home'; showHome(next, 1); }
       else startReplay();
       return;
     }
@@ -556,8 +602,7 @@
   ChainLevels.load().then(function (loaded) {
     towers = loaded;
     progress = ChainProgress.create();
-    useTower(startingTower());
-    showTower(true);
+    showHome(startingTower(), 0);
     requestAnimationFrame(frame);
   }).catch(function (err) {
     statusEl.textContent = 'לא הצלחתי לטעון את הקומות (' + err.message + '). פתחו את המשחק דרך שרת, למשל npx serve';
