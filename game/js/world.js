@@ -221,7 +221,8 @@
       e.pairs.forEach(function (pair) {
         [[pair.bodyA.parent, pair.bodyB.parent], [pair.bodyB.parent, pair.bodyA.parent]].forEach(function (ab) {
           var part = ab[0].plugin.part, other = ab[1];
-          if (part && part.tray && !other.isStatic && other.speed > TOUCH_MIN_SPEED) game.touched[part.id] = true;
+          // A spring counts only when it is fired (see fireSpring), not when something rolls over it
+          if (part && part.tray && !part.tappable && !other.isStatic && other.speed > TOUCH_MIN_SPEED) game.touched[part.id] = true;
         });
       });
     });
@@ -296,6 +297,8 @@
       var r = b.circleRadius || 10;
       if (Math.abs(u) < part.w / 2 + r && h > 0 && h < part.h / 2 + r + SPRING_REACH) {
         Matter.Body.setVelocity(b, { x: b.velocity.x + up.x * SPRING_KICK, y: b.velocity.y + up.y * SPRING_KICK });
+        // A spring counts as touched when it launches something
+        if (game.started) game.touched[part.id] = true;
       }
     });
     return true;

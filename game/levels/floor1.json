@@ -1,17 +1,16 @@
 {
   "id": "floor1",
   "name": "קומה 5: מכונה קטנה",
-  "notes": "A row of dominoes knocks the ball off a shelf and down to the right wall. Ramps alone reach the basket for one star; for three, ramp b rolls the ball into a V with the spring by the left wall and a tap throws it over to the basket. With nothing placed the ball drops straight into the basket but touches no tray part, which does not count.",
+  "notes": "The dominoes push the ball off the shelf. Put the spring right under the end of the shelf to catch it and a ramp low down by the basket. The ramp alone gets the ball in for one star; tap the spring while the ball sits on it to throw it off the wall and onto the ramp for three. A spring only counts when it is fired.",
   "world": {"width": 600, "height": 1000},
   "push": {"target": "d1", "angularVelocity": 0.12},
   "tray": [
     {"id": "a", "type": "wall", "w": 280, "h": 16},
-    {"id": "b", "type": "wall", "w": 240, "h": 16},
     {"id": "s", "type": "spring"}
   ],
   "solutions": [
-    {"stars": 3, "tap": {"part": "s", "step": 440}, "placements": {"a": {"x": 455, "y": 470, "angle": 160}, "b": {"x": 206, "y": 715, "angle": 160}, "s": {"x": 50, "y": 742, "angle": 45}}},
-    {"stars": 1, "placements": {"a": {"x": 455, "y": 470, "angle": 160}, "b": {"x": 330, "y": 740, "angle": 20}, "s": {"x": 60, "y": 60, "angle": 0}}}
+    {"stars": 3, "tap": {"part": "s", "step": 230}, "placements": {"a": {"x": 420, "y": 838, "angle": 10}, "s": {"x": 428, "y": 250, "angle": 15}}},
+    {"stars": 1, "placements": {"a": {"x": 420, "y": 838, "angle": 10}, "s": {"x": 80, "y": 900, "angle": 0}}}
   ],
   "parts": [
     {"type": "wall", "x": 230, "y": 210, "w": 380, "h": 20},

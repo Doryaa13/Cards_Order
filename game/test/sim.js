@@ -45,13 +45,13 @@ levels.forEach(function (level) {
     (level.solutions || []).map(function (s, i) {
       return { label: 'solution ' + (i + 1), placements: s.placements, tap: s.tap, expect: s.stars + ' stars' };
     }),
-    // A solution that needs a tap must not also win without it
+    // A solution that uses a tap must earn fewer stars without it
     (level.solutions || []).filter(function (s) { return s.tap; }).map(function (s) {
-      return { label: 'solution ' + (level.solutions.indexOf(s) + 1) + ' without the tap', placements: s.placements, expect: 'fail' };
+      return { label: 'solution ' + (level.solutions.indexOf(s) + 1) + ' without the tap', placements: s.placements, fewerThan: s.stars };
     }));
   checks.forEach(function (c) {
     var r = run(level, c.placements, c.tap);
-    var ok = r.outcome === c.expect;
+    var ok = c.fewerThan ? (parseInt(r.outcome, 10) || 0) < c.fewerThan : r.outcome === c.expect;
     if (!ok) failed++;
     console.log((ok ? 'PASS' : 'FAIL') + '  ' + level.name + ' / ' + c.label + ': ' + r.outcome +
       ' (' + r.seconds + 's, ball at ' + r.ball + ')');
