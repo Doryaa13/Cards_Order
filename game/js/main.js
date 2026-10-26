@@ -97,7 +97,7 @@
     editor.setEnabled(false);
     document.body.classList.add('in-tower');
     winEl.hidden = true;
-    titleEl.textContent = towerData.name + ' · ★ ' + totalStars() + ' מתוך ' + levels.length * 3;
+    titleEl.textContent = towerData.name;
     btnTower.hidden = true;
     btnSwitch.hidden = towers.length < 2;
     btnSwitch.textContent = 'מגדלים';
@@ -108,7 +108,7 @@
       : '▶ לקומה ' + (progress.currentIndex(towerData) + 1);
     trayEl.classList.remove('locked', 'drop');
     trayEl.innerHTML = '<p class="tray-empty">' + trayText + '</p>';
-    statusEl.textContent = ' ';
+    statusEl.textContent = '★ ' + totalStars() + ' מתוך ' + levels.length * 3;
     tower.build();
     resize();
   }
@@ -270,7 +270,7 @@
       winTitleEl.textContent = 'הצלחת!';
       document.getElementById('win-stars').textContent = starText(s.stars);
       document.getElementById('win-text').textContent =
-        'הכדור נגע ב-' + s.touched + ' מתוך ' + s.total + ' חלקים' +
+        (many ? 'הכדורים נגעו ב-' : 'הכדור נגע ב-') + s.touched + ' מתוך ' + s.total + ' חלקים' +
         (s.stars < 3 ? '. נסו לגעת בכולם בשביל 3 כוכבים' : '. מושלם!');
       // Once every floor of a tower has a star, the next step is watching the whole tower run
       var done = progress.complete(towerData) && !towerData.open;

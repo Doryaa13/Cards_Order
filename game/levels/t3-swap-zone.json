@@ -1,0 +1,23 @@
+{
+  "id": "t3-swap-zone",
+  "name": "קומה 7: החלפה באזור אסור",
+  "notes": "The colour swap from floor 1, but the striped zone covers the high spot for the blue ramp. The blue ramp has to go lower, under the zone, and the red one finds its own way past it.",
+  "world": {"width": 600, "height": 1000},
+  "launch": {"vx": 0, "vy": 0},
+  "tray": [
+    {"id": "a", "type": "wall", "w": 300, "h": 16},
+    {"id": "b", "type": "wall", "w": 340, "h": 16}
+  ],
+  "solutions": [
+    {"stars": 3, "placements": {"a": {"x": 215, "y": 750, "angle": 15}, "b": {"x": 420, "y": 410, "angle": 155}}}
+  ],
+  "parts": [
+    {"type": "ball", "id": "ball", "x": 120, "y": 40, "r": 16, "color": "red"},
+    {"type": "ball", "id": "blue", "x": 480, "y": 40, "r": 16, "color": "blue"},
+    {"type": "basket", "x": 100, "y": 990, "w": 200, "h": 90, "color": "blue"},
+    {"type": "basket", "x": 500, "y": 990, "w": 200, "h": 90, "color": "red"}
+  ],
+  "noBuild": [
+    {"x": 330, "y": 240, "w": 300, "h": 160}
+  ]
+}

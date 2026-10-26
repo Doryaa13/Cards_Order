@@ -1,0 +1,21 @@
+{
+  "id": "t3-spring",
+  "name": "קומה 6: מכה בכחול",
+  "notes": "The spring throws the red ball across the floor; on its way it knocks the blue ball off its post into the blue basket, then drops into the red one.",
+  "world": {"width": 600, "height": 1000},
+  "launch": {"vx": 0, "vy": 0},
+  "tray": [
+    {"id": "s", "type": "spring"}
+  ],
+  "solutions": [
+    {"stars": 3, "tap": {"part": "s", "step": 180}, "placements": {"s": {"x": 50, "y": 742, "angle": 45}}}
+  ],
+  "parts": [
+    {"type": "ball", "id": "ball", "x": 250, "y": 40, "r": 16, "color": "red"},
+    {"type": "wall", "x": 206, "y": 715, "w": 240, "h": 16, "angle": 160},
+    {"type": "wall", "x": 500, "y": 528, "w": 14, "h": 24},
+    {"type": "ball", "id": "blue", "x": 500, "y": 500, "r": 16, "color": "blue"},
+    {"type": "basket", "x": 545, "y": 990, "w": 110, "h": 90, "color": "blue"},
+    {"type": "basket", "x": 405, "y": 990, "w": 150, "h": 90, "color": "red"}
+  ]
+}

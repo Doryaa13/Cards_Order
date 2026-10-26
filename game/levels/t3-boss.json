@@ -1,0 +1,29 @@
+{
+  "id": "t3-boss",
+  "name": "קומה 8: מכונת הצבעים",
+  "notes": "Boss floor: three lanes, three jobs. Ramps carry red and blue across their lanes (the striped zone pushes the blue ramp low); in the middle lane a diamond knocks the yellow ball about, and a funnel has to line it up with its narrow cup.",
+  "world": {"width": 600, "height": 1000},
+  "launch": {"vx": 0, "vy": 0},
+  "tray": [
+    {"id": "a", "type": "wall", "w": 90, "h": 16},
+    {"id": "c", "type": "wall", "w": 90, "h": 16},
+    {"id": "f", "type": "funnel", "w": 180}
+  ],
+  "solutions": [
+    {"stars": 3, "placements": {"a": {"x": 65, "y": 650, "angle": 20}, "c": {"x": 535, "y": 720, "angle": 160}, "f": {"x": 300, "y": 620, "angle": 0}}}
+  ],
+  "parts": [
+    {"type": "ball", "id": "ball", "x": 300, "y": 40, "r": 16, "color": "yellow"},
+    {"type": "ball", "id": "red", "x": 50, "y": 200, "r": 16, "color": "red"},
+    {"type": "ball", "id": "blue", "x": 550, "y": 200, "r": 16, "color": "blue"},
+    {"type": "wall", "x": 180, "y": 700, "w": 16, "h": 600},
+    {"type": "wall", "x": 420, "y": 700, "w": 16, "h": 600},
+    {"type": "basket", "x": 120, "y": 990, "w": 90, "h": 90, "color": "red"},
+    {"type": "basket", "x": 480, "y": 990, "w": 90, "h": 90, "color": "blue"},
+    {"type": "wall", "x": 300, "y": 470, "w": 40, "h": 40, "angle": 45},
+    {"type": "basket", "x": 300, "y": 990, "w": 70, "h": 80, "color": "yellow"}
+  ],
+  "noBuild": [
+    {"x": 510, "y": 520, "w": 164, "h": 260}
+  ]
+}

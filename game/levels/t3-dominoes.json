@@ -1,0 +1,22 @@
+{
+  "id": "t3-dominoes",
+  "name": "קומה 4: דומינו וצבעים",
+  "notes": "The grey ball drops onto a domino row that runs left and tips the blue ball off the shelf into the blue basket. The red ball falls past the end of the shelf and needs a ramp into the red basket in the middle.",
+  "world": {"width": 600, "height": 1000},
+  "launch": {"vx": 0, "vy": 0},
+  "tray": [
+    {"id": "d", "type": "dominoes", "count": 7},
+    {"id": "a", "type": "wall", "w": 220, "h": 16}
+  ],
+  "solutions": [
+    {"stars": 3, "placements": {"d": {"x": 310, "y": 560, "angle": 0}, "a": {"x": 490, "y": 820, "angle": 160}}}
+  ],
+  "parts": [
+    {"type": "ball", "id": "ball", "x": 400, "y": 40, "r": 16},
+    {"type": "wall", "x": 316, "y": 600, "w": 408, "h": 16},
+    {"type": "ball", "id": "blue", "x": 118, "y": 576, "r": 16, "color": "blue"},
+    {"type": "ball", "id": "red", "x": 560, "y": 300, "r": 16, "color": "red"},
+    {"type": "basket", "x": 90, "y": 990, "w": 180, "h": 90, "color": "blue"},
+    {"type": "basket", "x": 350, "y": 990, "w": 160, "h": 90, "color": "red"}
+  ]
+}

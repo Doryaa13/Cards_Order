@@ -1,0 +1,21 @@
+{
+  "id": "t3-funnel",
+  "name": "קומה 2: כוס צרה",
+  "notes": "The red ball is shot across the floor toward a narrow red cup; the blue ball drops by the right wall. A funnel catches the red ball, a ramp brings the blue one to its basket.",
+  "world": {"width": 600, "height": 1000},
+  "launch": {"vx": 4, "vy": 0},
+  "tray": [
+    {"id": "f", "type": "funnel"},
+    {"id": "a", "type": "wall", "w": 220, "h": 16}
+  ],
+  "solutions": [
+    {"stars": 3, "placements": {"f": {"x": 200, "y": 280, "angle": 0}, "a": {"x": 470, "y": 580, "angle": 160}}}
+  ],
+  "parts": [
+    {"type": "ball", "id": "ball", "x": 90, "y": 40, "r": 16, "color": "red"},
+    {"type": "ball", "id": "blue", "x": 560, "y": 420, "r": 16, "color": "blue"},
+    {"type": "wall", "x": 300, "y": 745, "w": 600, "h": 16},
+    {"type": "basket", "x": 200, "y": 737, "w": 100, "h": 80, "color": "red"},
+    {"type": "basket", "x": 350, "y": 737, "w": 120, "h": 80, "color": "blue"}
+  ]
+}

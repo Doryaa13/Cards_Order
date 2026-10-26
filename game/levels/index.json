@@ -31,6 +31,21 @@
       ]
     },
     {
+      "id": "tower3",
+      "world": "עולם 1: בית המלאכה",
+      "name": "מגדל 3: צבעים",
+      "floors": [
+        "t3-swap.json",
+        "t3-funnel.json",
+        "t3-seesaw.json",
+        "t3-dominoes.json",
+        "t3-three.json",
+        "t3-spring.json",
+        "t3-swap-zone.json",
+        "t3-boss.json"
+      ]
+    },
+    {
       "id": "lab",
       "name": "המעבדה",
       "open": true,

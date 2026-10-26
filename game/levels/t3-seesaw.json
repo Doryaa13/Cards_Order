@@ -1,0 +1,21 @@
+{
+  "id": "t3-seesaw",
+  "name": "קומה 3: נדנדה וצבעים",
+  "notes": "The heavy grey ball works the seesaw to fling the red ball right, as in tower 2. Meanwhile the blue ball drops by the left wall: a ramp brings it into its basket under the seesaw.",
+  "world": {"width": 600, "height": 1000},
+  "launch": {"vx": 0, "vy": 0},
+  "tray": [
+    {"id": "s", "type": "seesaw"},
+    {"id": "a", "type": "wall", "w": 200, "h": 16}
+  ],
+  "solutions": [
+    {"stars": 3, "placements": {"s": {"x": 415, "y": 780, "angle": 0}, "a": {"x": 105, "y": 720, "angle": 15}}}
+  ],
+  "parts": [
+    {"type": "ball", "id": "ball", "x": 480, "y": 40, "r": 18, "heavy": true},
+    {"type": "ball", "id": "goal", "x": 342, "y": 560, "r": 16, "color": "red"},
+    {"type": "ball", "id": "blue", "x": 40, "y": 520, "r": 16, "color": "blue"},
+    {"type": "basket", "x": 520, "y": 990, "w": 160, "h": 90, "color": "red"},
+    {"type": "basket", "x": 180, "y": 990, "w": 240, "h": 90, "color": "blue"}
+  ]
+}
