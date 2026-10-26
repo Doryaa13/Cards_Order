@@ -25,12 +25,13 @@ function run(level, placements, tap) {
   ChainWorld.startChain(Matter, game);
   var t, outcome = null;
   for (t = 0; !outcome; t++) {
-    if (tap && t === tap.step) {
-      var spring = Matter.Composite.allBodies(game.engine.world).filter(function (b) {
-        return b.plugin.part && b.plugin.part.id === tap.part;
+    [].concat(tap || []).forEach(function (k) {
+      if (t !== k.step) return;
+      var part = Matter.Composite.allBodies(game.engine.world).filter(function (b) {
+        return b.plugin.part && b.plugin.part.id === k.part;
       })[0];
-      ChainWorld.fireSpring(Matter, game, spring);
-    }
+      ChainWorld.tapPart(Matter, game, part);
+    });
     Matter.Engine.update(game.engine, ChainWorld.STEP_MS);
     outcome = ChainWorld.checkOutcome(Matter, game);
   }

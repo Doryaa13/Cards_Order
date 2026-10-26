@@ -13,10 +13,16 @@
   var SEESAW_W = 220, SEESAW_H = 14, SEESAW_MAX = 30;   // a seesaw rocks between -30 and +30 degrees
   var ROW_SPACING = 34;
 
+  // Motorized parts run the whole time; a tap reverses them while they have charges left
+  var WIND_R = 95, WIND_BLADE = 14, WIND_SPIN = 2 * Math.PI / 200;   // one turn every ~3.3 seconds
+  var CONV_W = 220, CONV_H = 18, CONV_SPEED = 3.2;
+
   // Fills in the size of tray parts whose size is fixed by their type
   function trayItem(item) {
     var sizes = {
-      spring: { w: SPRING_W, h: SPRING_H, tappable: true },
+      spring: { w: SPRING_W, h: SPRING_H, tappable: true, charges: 1, firesToCount: true },
+      windmill: { w: WIND_R * 2, h: WIND_R * 2, tappable: true, motor: true, charges: 2, sweep: WIND_R, fixedAngle: true },
+      conveyor: { w: CONV_W, h: CONV_H, tappable: true, motor: true, charges: 2 },
       funnel: { w: FUNNEL_W, h: FUNNEL_H, gap: FUNNEL_GAP },
       seesaw: { w: SEESAW_W, h: SEESAW_H, maxAngle: SEESAW_MAX },
       dominoes: { w: ((item.count || 4) - 1) * ROW_SPACING + DOMINO_W, h: DOMINO_H, fixedAngle: true, snapDown: true }
@@ -31,11 +37,33 @@
   //   funnel    two walls in a V with an opening at the bottom
   //   seesaw    a plank on a pivot at its middle; during a run it tips, between its stops
   //   dominoes  a row of dominoes; during a run each one stands on its own
-  function makeTrayBodies(Matter, item, x, y, angleDeg, forRun) {
+  //   windmill  four blades on a motorized hub, turning all the time (dir 1 clockwise, -1 the other way)
+  //   conveyor  a belt that carries whatever lies on it along its length (dir 1 to the right)
+  function makeTrayBodies(Matter, item, x, y, angleDeg, forRun, dir) {
     item = trayItem(item);
     var Bodies = Matter.Bodies, Body = Matter.Body;
     var angle = (angleDeg || 0) * deg;
-    var tag = function (b) { b.render.kind = item.type; b.plugin.part = item; return b; };
+    var tag = function (b) {
+      b.render.kind = item.type;
+      b.plugin.part = item;
+      if (item.motor) b.plugin.dir = dir === -1 ? -1 : 1;
+      if (item.tappable) b.plugin.charges = item.charges;
+      return b;
+    };
+
+    if (item.type === 'windmill') {
+      var bladeA = Bodies.rectangle(0, 0, WIND_R * 2, WIND_BLADE);
+      var bladeB = Bodies.rectangle(0, 0, WIND_BLADE, WIND_R * 2);
+      var hub = Bodies.circle(0, 0, 16);
+      var mill = Body.create(forRun
+        ? { parts: [bladeA, bladeB, hub], density: 0.05, friction: 0.4, frictionAir: 0 }
+        : { parts: [bladeA, bladeB, hub], isStatic: true });
+      Body.setPosition(mill, { x: x, y: y });
+      Body.setAngle(mill, angle);
+      tag(mill);
+      if (forRun) mill.plugin.pivot = { x: x, y: y, motor: true };
+      return [mill];
+    }
 
     if (item.type === 'funnel') {
       // Each wall runs from a top corner down to the edge of the opening. Its center line stops a
@@ -93,14 +121,14 @@
     }
 
     var body = Bodies.rectangle(x, y, item.w, item.h, {
-      isStatic: true, angle: angle, friction: item.type === 'spring' ? 0.9 : 0.6
+      isStatic: true, angle: angle, friction: item.type === 'spring' || item.type === 'conveyor' ? 0.9 : 0.6
     });
     return [tag(body)];
   }
 
   // The editing body of a tray part (one per part)
-  function makeTrayBody(Matter, item, x, y, angleDeg) {
-    return makeTrayBodies(Matter, item, x, y, angleDeg, false)[0];
+  function makeTrayBody(Matter, item, x, y, angleDeg, dir) {
+    return makeTrayBodies(Matter, item, x, y, angleDeg, false, dir)[0];
   }
 
   // placements: { trayItemId: { x, y, angle } } for the tray parts the player put on the board.
@@ -178,7 +206,7 @@
     (level.tray || []).forEach(function (item) {
       var at = placements && placements[item.id];
       if (!at) return;
-      makeTrayBodies(Matter, item, at.x, at.y, at.angle, forRun).forEach(function (b) {
+      makeTrayBodies(Matter, item, at.x, at.y, at.angle, forRun, at.dir).forEach(function (b) {
         Composite.add(engine.world, b);
         if (b.plugin.pivot) {
           pivots.push(b);
@@ -199,10 +227,32 @@
       baskets: baskets, goal: baskets[0] || null, goalBalls: goalBalls
     };
 
+    // Windmills turn at a steady speed whatever hits them; conveyors carry what touches them
+    var mills = pivots.filter(function (b) { return b.plugin.pivot.motor; });
+    var belts = Matter.Composite.allBodies(engine.world).filter(function (b) { return b.plugin.part && b.plugin.part.type === 'conveyor'; });
+    if (forRun && (mills.length || belts.length)) {
+      Matter.Events.on(engine, 'beforeUpdate', function () {
+        mills.forEach(function (b) { Matter.Body.setAngularVelocity(b, b.plugin.dir * WIND_SPIN); });
+        if (!belts.length) return;
+        engine.pairs.list.forEach(function (pair) {
+          if (!pair.isActive) return;
+          var a = pair.bodyA.parent, c = pair.bodyB.parent, belt = null, other = null;
+          if (belts.indexOf(a) >= 0) { belt = a; other = c; } else if (belts.indexOf(c) >= 0) { belt = c; other = a; }
+          if (!belt || other.isStatic) return;
+          // Keep the speed across the belt, set the speed along it
+          var ax = Math.cos(belt.angle), ay = Math.sin(belt.angle);
+          var along = other.velocity.x * ax + other.velocity.y * ay;
+          var target = belt.plugin.dir * CONV_SPEED;
+          Matter.Body.setVelocity(other, { x: other.velocity.x + (target - along) * ax, y: other.velocity.y + (target - along) * ay });
+        });
+      });
+    }
+
     // A seesaw rocks between stops on either side of level
-    if (pivots.length) {
+    var stops = pivots.filter(function (b) { return b.plugin.pivot.max; });
+    if (stops.length) {
       Matter.Events.on(engine, 'afterUpdate', function () {
-        pivots.forEach(function (b) {
+        stops.forEach(function (b) {
           // Only motion further past a stop is cancelled; a push back toward level is kept
           var max = b.plugin.pivot.max, side = Math.sign(b.angle);
           if (Math.abs(b.angle) > max) {
@@ -222,7 +272,7 @@
         [[pair.bodyA.parent, pair.bodyB.parent], [pair.bodyB.parent, pair.bodyA.parent]].forEach(function (ab) {
           var part = ab[0].plugin.part, other = ab[1];
           // A spring counts only when it is fired (see fireSpring), not when something rolls over it
-          if (part && part.tray && !part.tappable && !other.isStatic && other.speed > TOUCH_MIN_SPEED) game.touched[part.id] = true;
+          if (part && part.tray && !part.firesToCount && !other.isStatic && other.speed > TOUCH_MIN_SPEED) game.touched[part.id] = true;
         });
       });
     });
@@ -275,19 +325,47 @@
     var b = body.bounds;
     if (b.min.x < 0 || b.min.y < 0 || b.max.x > game.width || b.max.y > game.height) return false;
     var others = Matter.Composite.allBodies(game.engine.world).filter(function (o) { return o !== body; });
+    // A windmill needs room for its blades to turn: check the whole circle they sweep
+    var sweep = body.plugin.part && body.plugin.part.sweep;
+    if (sweep) {
+      var c = body.position;
+      if (c.x - sweep < 0 || c.y - sweep < 0 || c.x + sweep > game.width || c.y + sweep > game.height) return false;
+      var disc = Matter.Bodies.circle(c.x, c.y, sweep);
+      var solid = others.filter(function (o) { return o.isStatic && !o.isSensor && o.render.kind !== 'bound'; });
+      if (Matter.Query.collides(disc, solid).some(function (k) { return k.depth > ALLOWED_DEPTH; })) return false;
+    }
+    // ...and nothing else may be placed inside another windmill's circle
+    var mills = others.filter(function (o) { return o.plugin.part && o.plugin.part.sweep; });
+    if (mills.length && !(body.plugin.part && body.plugin.part.sweep) && body.render.kind !== 'bound') {
+      var hitsMill = mills.some(function (m) {
+        var d = Matter.Bodies.circle(m.position.x, m.position.y, m.plugin.part.sweep);
+        return Matter.Query.collides(d, [body]).some(function (k) { return k.depth > ALLOWED_DEPTH; });
+      });
+      if (hitsMill) return false;
+    }
     var pieces = (body.parts.length > 1 ? body.parts.slice(1) : [body]).filter(function (p) { return !p.isSensor; });
     return pieces.every(function (piece) {
       return !Matter.Query.collides(piece, others).some(function (c) { return c.depth > ALLOWED_DEPTH; });
     });
   }
 
-  // Fires a spring: everything resting on (or just above) its pad is launched the way the pad faces.
-  // Each spring has one charge per run.
-  function fireSpring(Matter, game, spring) {
-    if (spring.plugin.used) return false;
-    spring.plugin.used = true;
+  // A tap on a tappable part, if it has a charge left. A spring launches what rests on it;
+  // a motorized part (windmill, conveyor) reverses.
+  function tapPart(Matter, game, body) {
+    if (!(body.plugin.charges > 0)) return false;
+    body.plugin.charges -= 1;
+    body.plugin.used = body.plugin.charges === 0;
     game.tapUsed = true;
-    spring.plugin.firedAt = game.steps || 0;
+    body.plugin.firedAt = game.steps || 0;
+    if (body.plugin.part.motor) {
+      body.plugin.dir = -body.plugin.dir;
+      return true;
+    }
+    return fireSpring(Matter, game, body);
+  }
+
+  // Fires a spring: everything resting on (or just above) its pad is launched the way the pad faces
+  function fireSpring(Matter, game, spring) {
     var a = spring.angle, part = spring.plugin.part;
     var up = { x: Math.sin(a), y: -Math.cos(a) }, along = { x: Math.cos(a), y: Math.sin(a) };
     Matter.Composite.allBodies(game.engine.world).forEach(function (b) {
@@ -307,7 +385,7 @@
   // True while the player can still change the run with a tap
   function tapAvailable(Matter, game) {
     return Matter.Composite.allBodies(game.engine.world).some(function (b) {
-      return b.plugin.part && b.plugin.part.tappable && !b.plugin.used;
+      return b.plugin.part && b.plugin.part.tappable && b.plugin.charges > 0;
     });
   }
 
@@ -341,7 +419,10 @@
       game.ballLast = game.goalBalls.map(function (b) { return { x: b.position.x, y: b.position.y }; });
       game.stillSeconds = stuck ? (game.stillSeconds || 0) + 1 : 0;
 
-      var bodies = Matter.Composite.allBodies(game.engine.world).filter(function (b) { return !b.isStatic; });
+      // A windmill turns forever, so it does not count as something still happening
+      var bodies = Matter.Composite.allBodies(game.engine.world).filter(function (b) {
+        return !b.isStatic && !(b.plugin.part && b.plugin.part.motor);
+      });
       var prev = game.bodiesLast || [];
       var anyMoved = bodies.some(function (b, i) {
         return !prev[i] || Math.abs(b.position.x - prev[i].x) + Math.abs(b.position.y - prev[i].y) > 3;
@@ -357,7 +438,7 @@
   var api = {
     buildWorld: buildWorld, makeTrayBody: makeTrayBody, trayItem: trayItem, startChain: startChain,
     ballInGoal: ballInGoal, goalBall: goalBall, inOwnBasket: inOwnBasket,
-    fireSpring: fireSpring, tapAvailable: tapAvailable, placementOk: placementOk,
+    fireSpring: tapPart, tapPart: tapPart, tapAvailable: tapAvailable, placementOk: placementOk,
     checkOutcome: checkOutcome, score: score, STEP_MS: 1000 / 60
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

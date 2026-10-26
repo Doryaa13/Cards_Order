@@ -53,7 +53,10 @@
         "lab-seesaw.json",
         "lab-funnel.json",
         "lab-dominoes.json",
-        "lab-relay.json"
+        "lab-relay.json",
+        "lab-windmill.json",
+        "lab-conveyor.json",
+        "lab-sort.json"
       ]
     }
   ]

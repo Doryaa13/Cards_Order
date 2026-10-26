@@ -1,0 +1,19 @@
+{
+  "id": "lab-conveyor",
+  "name": "מעבדה 6: מסוע",
+  "notes": "The ramp drops the ball into the bottom-right pit. A conveyor tilted up to the left, running uphill, catches it and carries it over the wall to the basket. Running the other way it just feeds the pit; a tap during the run reverses it.",
+  "world": {"width": 600, "height": 1000},
+  "launch": {"vx": 2, "vy": 0},
+  "tray": [
+    {"id": "c", "type": "conveyor"}
+  ],
+  "solutions": [
+    {"stars": 3, "placements": {"c": {"x": 460, "y": 650, "angle": 20, "dir": -1}}}
+  ],
+  "parts": [
+    {"type": "ball", "id": "ball", "x": 90, "y": 40, "r": 16},
+    {"type": "wall", "x": 300, "y": 420, "w": 520, "h": 16, "angle": 20},
+    {"type": "wall", "x": 420, "y": 860, "w": 16, "h": 280},
+    {"type": "basket", "x": 150, "y": 990, "w": 220, "h": 70}
+  ]
+}

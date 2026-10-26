@@ -43,13 +43,18 @@
       ctx.fill();
     }
 
-    // Badge on a spring's top-left corner (clear of the rotate handle): "1" while its tap is still
-    // available, a grey "0" once spent
-    function drawChargeBadge(body, charged) {
-      var part = body.plugin.part, r = px(10);
-      var x = body.position.x - Math.cos(body.angle) * part.w / 2 + Math.sin(body.angle) * part.h / 2;
-      var y = body.position.y - Math.sin(body.angle) * part.w / 2 - Math.cos(body.angle) * part.h / 2;
-      ctx.fillStyle = charged ? COLORS.charge : COLORS.spent;
+    // Badge with the taps a part has left, on its top-left corner (clear of the rotate handle),
+    // grey once spent. A windmill has it beside the hub.
+    function drawChargeBadge(body) {
+      var part = body.plugin.part, r = px(10), n = body.plugin.charges || 0;
+      var x, y;
+      if (part.type === 'windmill') {
+        x = body.position.x - px(24); y = body.position.y - px(24);
+      } else {
+        x = body.position.x - Math.cos(body.angle) * part.w / 2 + Math.sin(body.angle) * part.h / 2;
+        y = body.position.y - Math.sin(body.angle) * part.w / 2 - Math.cos(body.angle) * part.h / 2;
+      }
+      ctx.fillStyle = n > 0 ? COLORS.charge : COLORS.spent;
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.fill();
@@ -60,7 +65,95 @@
       ctx.font = '700 ' + px(13) + 'px system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(charged ? '1' : '0', x, y + px(1));
+      ctx.fillText(String(n), x, y + px(1));
+    }
+
+    // While a part can still be tapped during a run: a pulsing ring and a label saying what a tap
+    // does. Right after a tap, a fading note.
+    function drawTapHints(body, ringR, label, spentLabel) {
+      var charged = body.plugin.charges > 0;
+      var fired = body.plugin.firedAt != null ? game.steps - body.plugin.firedAt : Infinity;
+      if (mode === 'run' && charged) {
+        var pulse = 0.5 + 0.5 * Math.sin(performance.now() / 180);
+        ctx.strokeStyle = 'rgba(224,102,47,' + (0.35 + 0.5 * pulse) + ')';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(body.position.x, body.position.y, ringR + 4 * pulse, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      if (mode === 'static') return;
+      drawChargeBadge(body);
+      if (mode === 'run' && charged && fired >= 60) drawCallout(body, label);
+      if (fired < 60) drawCallout(body, spentLabel, 1 - fired / 60);
+    }
+
+    // The way a motor turns: a curved arrow around a windmill, chevrons along a conveyor belt
+    function drawWindmill(body, fill) {
+      var part = body.plugin.part, R = part.sweep, dir = body.plugin.dir || 1, c = body.position;
+      // The circle the blades sweep, so it is clear how much room it needs
+      ctx.strokeStyle = 'rgba(122,79,196,0.25)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 6]);
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, R, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      drawBody(body, fill);
+      ctx.fillStyle = COLORS.wall;
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, 9, 0, Math.PI * 2);
+      ctx.fill();
+      // Arrow on the sweep circle, showing the way it turns
+      var a0 = -Math.PI / 2 - dir * 0.7, a1 = -Math.PI / 2 + dir * 0.7, ar = R + 12;
+      ctx.strokeStyle = COLORS.charge;
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, ar, Math.min(a0, a1), Math.max(a0, a1));
+      var hx = c.x + Math.cos(a1) * ar, hy = c.y + Math.sin(a1) * ar;
+      var tx = -Math.sin(a1) * dir, ty = Math.cos(a1) * dir;   // direction of travel at the tip
+      ctx.moveTo(hx - tx * 12 + ty * 9, hy - ty * 12 - tx * 9);
+      ctx.lineTo(hx, hy);
+      ctx.lineTo(hx - tx * 12 - ty * 9, hy - ty * 12 + tx * 9);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+      drawTapHints(body, R + 22, 'געו להפוך כיוון', 'הפוך!');
+    }
+
+    function drawConveyor(body, fill) {
+      var part = body.plugin.part, w = part.w, h = part.h, dir = body.plugin.dir || 1;
+      ctx.save();
+      ctx.translate(body.position.x, body.position.y);
+      ctx.rotate(body.angle);
+      ctx.fillStyle = fill;
+      roundRect(ctx, -w / 2, -h / 2, w, h, h / 2);
+      ctx.fill();
+      // Rollers
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      [-w / 2 + h / 2, 0, w / 2 - h / 2].forEach(function (x) {
+        ctx.beginPath();
+        ctx.arc(x, 0, h / 2 - 3, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      // Chevrons that slide along the belt while it runs
+      var gap = 26, shift = ((game.steps || 0) * 0.8 * dir) % gap;
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.rect(-w / 2 + h / 2, -h / 2, w - h, h);
+      ctx.save();
+      ctx.clip();
+      ctx.beginPath();
+      for (var x = -w / 2 - gap; x < w / 2 + gap; x += gap) {
+        var cx = x + shift;
+        ctx.moveTo(cx - dir * 4, -h / 2 + 4);
+        ctx.lineTo(cx + dir * 4, 0);
+        ctx.lineTo(cx - dir * 4, h / 2 - 4);
+      }
+      ctx.stroke();
+      ctx.restore();
+      ctx.restore();
+      drawTapHints(body, w / 2 + 10, 'געו להפוך כיוון', 'הפוך!');
     }
 
     // A small label next to a part: above it, or below when it sits near the top of the board
@@ -103,20 +196,8 @@
         ctx.lineTo(i % 2 ? w / 2 - 10 : -w / 2 + 10, y);
       }
       ctx.stroke();
-      var charged = !body.plugin.used;
-      if (mode === 'run' && charged) {
-        var pulse = 0.5 + 0.5 * Math.sin(performance.now() / 180);
-        ctx.strokeStyle = 'rgba(224,102,47,' + (0.35 + 0.5 * pulse) + ')';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(0, 0, w / 2 + 8 + 4 * pulse, 0, Math.PI * 2);
-        ctx.stroke();
-      }
       ctx.restore();
-      if (mode === 'static') return;
-      drawChargeBadge(body, charged);
-      if (mode === 'run' && charged) drawCallout(body, 'געו כאן · פעם אחת');
-      if (fired < 60) drawCallout(body, 'נוצל', 1 - fired / 60);
+      drawTapHints(body, w / 2 + 8, 'געו כאן · פעם אחת', 'נוצל');
     }
 
     // The stand a seesaw pivots on: a triangle under the middle of the plank
@@ -138,8 +219,9 @@
       var bad = editor && editor.isInvalid(body);
       var selected = editor && editor.isSelected(body);
       var hit = game.touched[id];
-      if (body.plugin.part.type === 'spring') {
-        drawSpring(body, hit ? COLORS.touched : bad ? COLORS.invalid : COLORS.movable);
+      var special = { spring: drawSpring, windmill: drawWindmill, conveyor: drawConveyor }[body.plugin.part.type];
+      if (special) {
+        special(body, hit ? COLORS.touched : bad ? COLORS.invalid : COLORS.movable);
         if (selected) {
           tracePath(body);
           ctx.strokeStyle = COLORS.handle;

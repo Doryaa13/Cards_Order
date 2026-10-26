@@ -28,6 +28,13 @@
     seesaw: { label: 'נדנדה', svg:
       '<rect x="2" y="8" width="36" height="4" rx="1.5" transform="rotate(-12 20 10)"/>' +
       '<polygon points="20,11 13,24 27,24" stroke="none"/>' },
+    windmill: { label: 'שבשבת עם מנוע, נגיעה הופכת כיוון', badge: true, svg:
+      '<rect x="4" y="11" width="32" height="4" rx="1.5" transform="rotate(20 20 13)"/>' +
+      '<rect x="18" y="-3" width="4" height="32" rx="1.5" transform="rotate(20 20 13)"/>' +
+      '<circle cx="20" cy="13" r="3.5"/>' },
+    conveyor: { label: 'מסוע, נגיעה הופכת כיוון', badge: true, svg:
+      '<rect x="2" y="8" width="36" height="10" rx="5"/>' +
+      '<path d="M12,10 16,13 12,16 M20,10 24,13 20,16 M28,10 32,13 28,16" fill="none" stroke="#fff" stroke-width="1.6"/>' },
     dominoes: { label: 'שורת דומינו', svg:
       '<rect x="5" y="3" width="4" height="20" rx="1"/><rect x="14" y="3" width="4" height="20" rx="1"/>' +
       '<rect x="23" y="3" width="4" height="20" rx="1"/><rect x="32" y="3" width="4" height="20" rx="1"/>' }
@@ -208,7 +215,7 @@
       if (icon) {
         btn.setAttribute('aria-label', icon.label);
         btn.innerHTML = '<svg class="tray-icon" viewBox="0 0 40 26" aria-hidden="true">' + icon.svg + '</svg>' +
-          (icon.badge ? '<span class="tray-badge">1</span>' : '');
+          (icon.badge ? '<span class="tray-badge">' + ChainWorld.trayItem(item).charges + '</span>' : '');
       } else {
         btn.setAttribute('aria-label', 'רמפה באורך ' + item.w);
         var bar = document.createElement('span');
@@ -233,8 +240,10 @@
     trayEl.classList.toggle('drop', editor.isDraggingOverTray());
     btnPlay.disabled = left > 0;
     var hasSpring = trayItems.some(function (it) { return it.type === 'spring'; });
+    var hasMotor = trayItems.some(function (it) { return ChainWorld.trayItem(it).motor; });
     statusEl.textContent = left > 0
       ? 'גררו את החלקים מהמאגר ללוח (נשארו ' + left + ')'
+      : hasMotor ? 'החץ ⇄ ליד המנוע קובע כיוון. בריצה, נגיעה הופכת. "הפעל"'
       : hasSpring ? 'בזמן הריצה אפשר לגעת בקפיץ פעם אחת. מוכנים? "הפעל"'
       : 'מוכנים? לחצו "הפעל"';
   }
@@ -315,7 +324,10 @@
     var s = ChainWorld.score(game);
     var text = 'חלקים שנגעו: ' + s.touched + ' מתוך ' + s.total;
     if (ChainWorld.tapAvailable(Matter, game)) {
-      text += game.stillSeconds >= 1 ? ' · געו בקפיץ!' : ' · נגיעה אחת זמינה';
+      var left = Matter.Composite.allBodies(game.engine.world).reduce(function (n, b) {
+        return n + (b.plugin.part && b.plugin.part.tappable ? b.plugin.charges || 0 : 0);
+      }, 0);
+      text += game.stillSeconds >= 1 ? ' · נסו לגעת!' : left === 1 ? ' · נגיעה אחת זמינה' : ' · ' + left + ' נגיעות זמינות';
     } else if (game.tapUsed) {
       text += ' · הנגיעה נוצלה';
     }
@@ -324,19 +336,24 @@
     statusEl.textContent = text;
   }
 
-  // One tap per run: it fires the tapped spring, or the only spring on the board wherever you tap
+  // A tap during a run uses a charge of the tapped part (a spring fires, a motor reverses), or of the
+  // only tappable part on the board wherever you tap
   function onRunTap(e) {
     if (view !== 'floor' || mode !== 'run' || !ChainWorld.tapAvailable(Matter, game)) return;
     var rect = canvas.getBoundingClientRect();
     var p = { x: (e.clientX - rect.left) / scale, y: (e.clientY - rect.top) / scale };
-    var springs = Matter.Composite.allBodies(game.engine.world).filter(function (b) {
-      return b.plugin.part && b.plugin.part.tappable;
+    var parts = Matter.Composite.allBodies(game.engine.world).filter(function (b) {
+      return b.plugin.part && b.plugin.part.tappable && b.plugin.charges > 0;
     });
-    var target = springs.length === 1 ? springs[0] : null;
-    springs.forEach(function (b) {
-      if (Math.hypot(b.position.x - p.x, b.position.y - p.y) < 50 + 30 / scale) target = b;
+    var target = parts.length === 1 ? parts[0] : null, best = Infinity;
+    parts.forEach(function (b) {
+      // Distance from the part's outline (a windmill: its sweep circle); a finger's width counts as on it
+      var d = b.plugin.part.sweep
+        ? Math.max(0, Math.hypot(b.position.x - p.x, b.position.y - p.y) - b.plugin.part.sweep)
+        : Math.hypot(Math.max(b.bounds.min.x - p.x, 0, p.x - b.bounds.max.x), Math.max(b.bounds.min.y - p.y, 0, p.y - b.bounds.max.y));
+      if (d < 30 + 30 / scale && d < best) { best = d; target = b; }
     });
-    if (target && ChainWorld.fireSpring(Matter, game, target)) {
+    if (target && ChainWorld.tapPart(Matter, game, target)) {
       runTaps.push({ part: target.plugin.part.id, step: game.steps || 0 });
       e.preventDefault();
     }
@@ -380,7 +397,7 @@
         var spring = Matter.Composite.allBodies(g.engine.world).filter(function (b) {
           return b.plugin.part && b.plugin.part.id === t.part;
         })[0];
-        if (spring) ChainWorld.fireSpring(Matter, g, spring);
+        if (spring) ChainWorld.tapPart(Matter, g, spring);
       });
       Matter.Engine.update(g.engine, ChainWorld.STEP_MS);
       accumulator -= ChainWorld.STEP_MS;

@@ -1,0 +1,19 @@
+{
+  "id": "lab-windmill",
+  "name": "מעבדה 5: שבשבת",
+  "notes": "The ball drops into the right bin, a dead end. A windmill under the drop throws the ball the way its top turns: turning left (the arrow) it lands over the divider in the basket. The wrong way mostly loses.",
+  "world": {"width": 600, "height": 1000},
+  "launch": {"vx": 0, "vy": 0},
+  "tray": [
+    {"id": "w", "type": "windmill"}
+  ],
+  "solutions": [
+    {"stars": 3, "placements": {"w": {"x": 360, "y": 250, "angle": 0, "dir": -1}}}
+  ],
+  "parts": [
+    {"type": "ball", "id": "ball", "x": 400, "y": 40, "r": 16},
+    {"type": "wall", "x": 330, "y": 800, "w": 16, "h": 400},
+    {"type": "wall", "x": 460, "y": 700, "w": 250, "h": 16, "angle": -15},
+    {"type": "basket", "x": 160, "y": 990, "w": 300, "h": 70}
+  ]
+}

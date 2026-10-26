@@ -62,11 +62,14 @@
         });
         return inside(spots[0]) || !inside(spots[1]) ? spots[0] : spots[1];
       }
+      var move = pick([axis + Math.PI / 2, axis - Math.PI / 2], thick / 2 + gap + r);
       return {
         r: r,
-        // Parts that always stand upright (a domino row) have no rotate handle
+        // Parts that always stand upright (a domino row, a windmill) have no rotate handle
         rotate: part.fixedAngle ? null : pick([axis, axis + Math.PI], long / 2 + gap + r),
-        move: pick([axis + Math.PI / 2, axis - Math.PI / 2], thick / 2 + gap + r)
+        move: move,
+        // A motor gets a third handle, opposite the move handle, that flips the way it turns
+        flip: part.motor ? pick([move.offset + Math.PI, move.offset], thick / 2 + gap + r) : null
       };
     }
 
@@ -126,6 +129,13 @@
         var dm = Math.hypot(p.x - hs.move.x, p.y - hs.move.y);
         var reach = HANDLE_HIT_PX / opts.getScale();
         var onOtherPart = hit && hit !== selected && best === 0;
+        var df = hs.flip ? Math.hypot(p.x - hs.flip.x, p.y - hs.flip.y) : Infinity;
+        if (df < Math.min(dr, dm) && (df < hs.r || (df < reach && !onOtherPart))) {
+          selected.plugin.dir = -(selected.plugin.dir || 1);
+          e.preventDefault();
+          opts.onChange();
+          return;
+        }
         var nearest = dr <= dm ? 'rotate' : 'move', dn = Math.min(dr, dm);
         if (dn < hs.r || (dn < reach && !onOtherPart)) {
           drag = nearest === 'rotate'
@@ -218,6 +228,7 @@
             x: Math.round(b.position.x), y: Math.round(b.position.y),
             angle: Math.round(b.angle / deg)
           };
+          if (b.plugin.part.motor) out[b.plugin.part.id].dir = b.plugin.dir;
         });
         return out;
       },
@@ -229,7 +240,7 @@
         if (!enabled || !selected) return;
         var hs = handlesFor(selected), c = selected.position, r = hs.r, k = 1 / opts.getScale();
         var color = invalid ? colors.invalid : colors.handle;
-        [hs.rotate, hs.move].filter(Boolean).forEach(function (h) {
+        [hs.rotate, hs.move, hs.flip].filter(Boolean).forEach(function (h) {
           ctx.strokeStyle = color;
           ctx.lineWidth = 2 * k;
           ctx.setLineDash([4 * k, 4 * k]);
@@ -276,6 +287,18 @@
           ctx.lineTo(tx - d[0] * hd + d[1] * hd, ty - d[1] * hd + d[0] * hd);
         });
         ctx.stroke();
+
+        // Flip icon: two arrows pointing opposite ways
+        var F = hs.flip;
+        if (F) {
+          var fi = r * 0.5;
+          ctx.beginPath();
+          ctx.moveTo(F.x - fi, F.y - fi * 0.45); ctx.lineTo(F.x + fi, F.y - fi * 0.45);
+          ctx.lineTo(F.x + fi - hd, F.y - fi * 0.45 - hd);
+          ctx.moveTo(F.x + fi, F.y + fi * 0.45); ctx.lineTo(F.x - fi, F.y + fi * 0.45);
+          ctx.lineTo(F.x - fi + hd, F.y + fi * 0.45 + hd);
+          ctx.stroke();
+        }
         ctx.lineCap = 'butt';
       }
     };
